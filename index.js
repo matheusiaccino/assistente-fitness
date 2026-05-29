@@ -39,10 +39,11 @@ app.post('/webhook', async (req, res) => {
     if (!historicos[phone]) historicos[phone] = [];
     historicos[phone].push({ role: 'user', content: texto });
     if (historicos[phone].length > 20) historicos[phone] = historicos[phone].slice(-20);
+    const plano = assinantes[phone] || 'completo';
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
-      system: getSystemPrompt(assinantes[phone] || 'completo'),
+      system: getSystemPrompt(plano),
       messages: historicos[phone]
     });
     const resposta = response.content[0].text;
