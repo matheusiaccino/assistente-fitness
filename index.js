@@ -5,13 +5,8 @@ app.use(express.json());
 const Anthropic = require('@anthropic-ai/sdk');
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Histórico de conversas por usuário
 const historicos = {};
-
-// Sistema de planos (simulado - depois integra com Hotmart)
-const assinantes = {
-  // Formato: "5569999999999": "completo" | "treino" | "dieta"
-};
+const assinantes = {};
 
 function getSystemPrompt(plano) {
   const base = `Você é o FitBot, assistente de saúde e bem-estar via WhatsApp.
@@ -23,19 +18,16 @@ Responda sempre em português brasileiro.`;
 sugira exercícios, séries e repetições. Pergunte sobre objetivo, nível e equipamentos disponíveis.
 NÃO dê dicas de dieta (isso é plano separado).`;
   }
-
   if (plano === 'dieta') {
     return base + `\nVocê é especialista em NUTRIÇÃO. Monte cardápios, calcule calorias, 
 sugira substituições saudáveis e receitas práticas. Pergunte sobre objetivo, restrições e rotina.
 NÃO dê dicas de treino (isso é plano separado).`;
   }
-
   if (plano === 'completo') {
     return base + `\nVocê é especialista em TREINO e NUTRIÇÃO. 
 Monte treinos personalizados E cardápios completos. 
 Pergunte sobre objetivo, nível de condicionamento, restrições alimentares e equipamentos disponíveis.`;
   }
-
   return base + `\nO usuário ainda não tem plano ativo. 
 Apresente-se brevemente e informe os planos disponíveis:
 🏋️ Plano Treino - R$ 29/mês
@@ -44,34 +36,60 @@ Apresente-se brevemente e informe os planos disponíveis:
 Diga que para assinar é só acessar: [seu link aqui]`;
 }
 
+async function enviarMensagem(phone, mensagem) {
+  try {
+    const EVOLUTION_URL = process.env.EVOLUTION_URL;
+    const EVOLUTION_KEY = process.env.EVOLUTION_KEY;
+    const INSTANCE = process.env.EVOLUTION_INSTANCE;
+
+    await fetch(`${EVOLUTION_URL}/message/sendText/${INSTANCE}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_KEY
+      },
+      body: JSON.stringify({
+        number: phone,
+        text: mensagem
+      })
+    });
+  } catch (error) {
+    console.error('Erro ao enviar mensagem:', error);
+  }
+}
+
 app.post('/webhook', async (req, res) => {
   try {
-    const { phone, message } = req.body;
+    const body = req.body;
 
-    if (!phone || !message) {
-      return res.status(400).json({ error: 'phone e message são obrigatórios' });
-    }
+    // Ignora se não for mensagem
+    if (body.event !== 'messages.upsert') return res.sendStatus(200);
 
-    // Verifica plano do usuário
+    const msg = body.data?.message;
+    if (!msg) return res.sendStatus(200);
+
+    // Pega o texto da mensagem
+    const texto = msg.message?.conversation || 
+                  msg.message?.extendedTextMessage?.text || '';
+    
+    if (!texto) return res.sendStatus(200);
+
+    // Ignora mensagens do próprio bot
+    if (msg.key?.fromMe) return res.sendStatus(200);
+
+    const phone = msg.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    if (!phone) return res.sendStatus(200);
+
     const plano = assinantes[phone] || null;
 
-    // Inicializa histórico se não existir
-    if (!historicos[phone]) {
-      historicos[phone] = [];
-    }
+    if (!historicos[phone]) historicos[phone] = [];
 
-    // Adiciona mensagem do usuário ao histórico
-    historicos[phone].push({
-      role: 'user',
-      content: message
-    });
+    historicos[phone].push({ role: 'user', content: texto });
 
-    // Limita histórico a 20 mensagens (para não gastar muitos créditos)
     if (historicos[phone].length > 20) {
       historicos[phone] = historicos[phone].slice(-20);
     }
 
-    // Chama a API do Claude
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
@@ -81,28 +99,22 @@ app.post('/webhook', async (req, res) => {
 
     const resposta = response.content[0].text;
 
-    // Adiciona resposta ao histórico
-    historicos[phone].push({
-      role: 'assistant',
-      content: resposta
-    });
+    historicos[phone].push({ role: 'assistant', content: resposta });
 
-    res.json({ reply: resposta });
+    await enviarMensagem(phone, resposta);
 
+    res.sendStatus(200);
   } catch (error) {
     console.error('Erro:', error);
-    res.status(500).json({ error: 'Erro interno' });
+    res.sendStatus(500);
   }
 });
 
-// Rota para adicionar/atualizar assinante (chamada pelo Hotmart)
 app.post('/assinante', (req, res) => {
   const { phone, plano, secret } = req.body;
-  
   if (secret !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Não autorizado' });
   }
-
   assinantes[phone] = plano;
   res.json({ success: true, phone, plano });
 });
