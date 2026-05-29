@@ -42,7 +42,7 @@ app.post('/webhook', async (req, res) => {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
-      system: getSystemPrompt(assinantes[phone] || completo),
+      system: getSystemPrompt(assinantes[phone] || 'completo'),
       messages: historicos[phone]
     });
     const resposta = response.content[0].text;
