@@ -25,90 +25,109 @@ const TIPOS_CONTRATO = {
 
 const PERGUNTAS = {
   'Prestação de Serviços': [
-    'Qual é o seu nome completo e CPF ou CNPJ?',
-    'Qual é o nome completo e CPF ou CNPJ do cliente?',
-    'Qual serviço será prestado? Descreva com detalhes.',
-    'Qual o valor combinado pelo serviço?',
-    'Como será o pagamento? (à vista, parcelado ou mensal)',
-    'Qual a data de início do serviço?',
-    'Tem prazo de término ou é indeterminado?',
-    'O serviço será presencial ou remoto?',
-    'Haverá multa por cancelamento? Se sim, qual o valor?'
+    'Qual É O Seu Nome Completo E CPF Ou CNPJ?',
+    'Qual É O Nome Completo E CPF Ou CNPJ Do Cliente?',
+    'Qual Serviço Será Prestado? Descreva Com Detalhes.',
+    'Qual O Valor Combinado Pelo Serviço?',
+    'Como Será O Pagamento? (À Vista, Parcelado Ou Mensal)',
+    'Qual A Data De Início Do Serviço?',
+    'Tem Prazo De Término Ou É Indeterminado?',
+    'O Serviço Será Presencial Ou Remoto?',
+    'Haverá Multa Por Cancelamento? Se Sim, Qual O Valor?'
   ],
   'Aluguel de Imóvel': [
-    'Qual o nome completo e CPF do proprietário?',
-    'Qual o nome completo e CPF do inquilino?',
-    'Qual o endereço completo do imóvel?',
-    'Qual o valor do aluguel mensal?',
-    'Qual o dia de vencimento do aluguel?',
-    'Qual a duração do contrato? (ex: 12 meses)',
-    'Haverá depósito caução? Se sim, qual o valor?',
-    'Quem pagará água, luz e condomínio?',
-    'Permite animais de estimação? Permite reformas?',
-    'Haverá fiador? Se sim, qual o nome e CPF?'
+    'Qual O Nome Completo E CPF Do Proprietário?',
+    'Qual O Nome Completo E CPF Do Inquilino?',
+    'Qual O Endereço Completo Do Imóvel?',
+    'Qual O Valor Do Aluguel Mensal?',
+    'Qual O Dia De Vencimento Do Aluguel?',
+    'Qual A Data De Início Do Contrato? (ex: 01/07/2026)',
+    'Qual A Data De Término Do Contrato? (ex: 30/06/2028)',
+    'Haverá Depósito Caução? Se Sim, Qual O Valor?',
+    'Permite Animais De Estimação? Permite Reformas?',
+    'Haverá Fiador? Se Sim, Qual O Nome E CPF?',
+    'Qual O Método De Reajuste Do Aluguel?\n\n1️⃣ IGPM/FGV (índice de mercado)\n2️⃣ Salário Mínimo (o aluguel equivale a X salários mínimos e reajusta conforme o salário mínimo aumenta)\n3️⃣ Outro método (descreva)'
   ],
   'Compra e Venda': [
-    'Qual o nome completo e CPF do vendedor?',
-    'Qual o nome completo e CPF do comprador?',
-    'O que está sendo vendido? (imóvel, veículo, outro)',
-    'Descreva detalhadamente o bem sendo vendido.',
-    'Qual o valor total da venda?',
-    'Como será o pagamento? (à vista, parcelado, financiado)',
-    'Qual a data de entrega ou transferência do bem?',
-    'O bem possui algum defeito conhecido?',
-    'Haverá multa em caso de desistência?'
+    'Qual O Nome Completo E CPF Do Vendedor?',
+    'Qual O Nome Completo E CPF Do Comprador?',
+    'O Que Está Sendo Vendido? (Imóvel, Veículo, Outro)',
+    'Descreva Detalhadamente O Bem Sendo Vendido.',
+    'Qual O Valor Total Da Venda?',
+    'Como Será O Pagamento? (À Vista, Parcelado, Financiado)',
+    'Qual A Data De Entrega Ou Transferência Do Bem?',
+    'O Bem Possui Algum Defeito Conhecido?',
+    'Haverá Multa Em Caso De Desistência?'
   ],
   'Contrato de Trabalho': [
-    'Qual o nome e CNPJ da empresa contratante?',
-    'Qual o nome completo e CPF do funcionário?',
-    'Qual a função ou cargo?',
-    'Qual o salário combinado?',
-    'Qual a carga horária semanal?',
-    'Qual a data de início?',
-    'É CLT, PJ ou contrato de experiência?',
-    'Quais benefícios? (VT, VR, plano de saúde, etc)',
-    'Haverá período de experiência? Qual a duração?'
+    'Qual O Nome E CNPJ Da Empresa Contratante?',
+    'Qual O Nome Completo E CPF Do Funcionário?',
+    'Qual A Função Ou Cargo?',
+    'Qual O Salário Combinado?',
+    'Qual A Carga Horária Semanal?',
+    'Qual A Data De Início?',
+    'É CLT, PJ Ou Contrato De Experiência?',
+    'Quais Benefícios? (VT, VR, Plano De Saúde, Etc)',
+    'Haverá Período De Experiência? Qual A Duração?'
   ],
   'Parceria / Sociedade': [
-    'Quais os nomes e CPF ou CNPJ de todos os sócios?',
-    'Qual o objetivo do negócio ou parceria?',
-    'Qual a porcentagem de participação de cada sócio?',
-    'Quanto cada sócio irá investir inicialmente?',
-    'Como será feita a divisão de lucros?',
-    'Quem ficará responsável pelas decisões do dia a dia?',
-    'O que acontece se um sócio quiser sair?',
-    'O contrato tem prazo definido ou é indeterminado?'
+    'Quais Os Nomes E CPF Ou CNPJ De Todos Os Sócios?',
+    'Qual O Objetivo Do Negócio Ou Parceria?',
+    'Qual A Porcentagem De Participação De Cada Sócio?',
+    'Quanto Cada Sócio Irá Investir Inicialmente?',
+    'Como Será Feita A Divisão De Lucros?',
+    'Quem Ficará Responsável Pelas Decisões Do Dia A Dia?',
+    'O Que Acontece Se Um Sócio Quiser Sair?',
+    'O Contrato Tem Prazo Definido Ou É Indeterminado?'
   ],
   'Outro': [
-    'Descreva com detalhes o que você precisa no contrato.',
-    'Quais são as partes envolvidas? (nomes e CPFs)',
-    'Quais são as obrigações de cada parte?',
-    'Qual o valor envolvido, se houver?',
-    'Qual o prazo do contrato?',
-    'Há alguma cláusula específica que deseja incluir?'
+    'Descreva Com Detalhes O Que Você Precisa No Contrato.',
+    'Quais São As Partes Envolvidas? (Nomes E CPFs)',
+    'Quais São As Obrigações De Cada Parte?',
+    'Qual O Valor Envolvido, Se Houver?',
+    'Qual O Prazo Do Contrato?',
+    'Há Alguma Cláusula Específica Que Deseja Incluir?'
   ]
 };
 
 async function gerarContrato(tipo, dados) {
-  const prompt = `Você é um especialista em contratos jurídicos brasileiros.
-Gere um contrato completo e profissional de ${tipo} com base nas seguintes informações:
+  const perguntasUsadas = PERGUNTAS[tipo];
+  
+  let instrucaoEspecial = '';
+  if (tipo === 'Aluguel de Imóvel') {
+    instrucaoEspecial = `
+INSTRUÇÕES ESPECIAIS PARA ALUGUEL:
+- O inquilino É RESPONSÁVEL por água, luz, condomínio e IPTU. Inclua isso nas cláusulas sem perguntar.
+- As datas de início e término já foram fornecidas, NÃO deixe espaços em branco para datas do contrato.
+- Para o reajuste, use exatamente o método informado pelo cliente. Se for salário mínimo, calcule quantos salários mínimos equivale o aluguel (salário mínimo atual R$ 1.518,00) e redija a cláusula de reajuste baseada nisso.`;
+  }
 
-${dados.map((d, i) => `${PERGUNTAS[tipo][i]}\nResposta: ${d}`).join('\n\n')}
+  const prompt = `Você É Um Especialista Em Contratos Jurídicos Brasileiros.
+Gere Um Contrato Completo E Profissional De ${tipo} Com Base Nas Seguintes Informações:
 
-IMPORTANTE - Formate o contrato usando estas marcações exatas:
-- Títulos principais (ex: CONTRATO DE...): use [TITULO]texto[/TITULO]
-- Títulos de cláusulas (ex: CLÁUSULA PRIMEIRA): use [CLAUSULA]texto[/CLAUSULA]
-- Texto em negrito importante: use [NEGRITO]texto[/NEGRITO]
-- Parágrafos normais: texto normal sem marcação
+${dados.map((d, i) => `${perguntasUsadas[i]}\nResposta: ${d}`).join('\n\n')}
 
-O contrato deve:
-- Estar em conformidade com a legislação brasileira vigente
-- Ter linguagem formal e profissional
-- Incluir todas as cláusulas necessárias
-- Ter data em branco para preenchimento
-- Incluir espaço para assinaturas das partes e duas testemunhas
+${instrucaoEspecial}
 
-Gere o contrato completo agora.`;
+REGRA OBRIGATÓRIA DE FORMATAÇÃO DO TEXTO:
+- TODAS as palavras do contrato devem ter a Primeira Letra Em Maiúsculo (Title Case)
+- Isso inclui parágrafos, cláusulas, nomes, endereços, tudo
+- Exceções apenas para artigos e preposições no meio da frase (de, da, do, em, e, ou, a, o)
+
+IMPORTANTE - Formate usando estas marcações:
+- Título principal: [TITULO]texto[/TITULO]
+- Títulos de cláusulas: [CLAUSULA]texto[/CLAUSULA]
+- Negrito importante: [NEGRITO]texto[/NEGRITO]
+- Parágrafos normais: texto normal
+
+O Contrato Deve:
+- Estar Em Conformidade Com A Legislação Brasileira Vigente
+- Ter Linguagem Formal E Profissional
+- Incluir Todas As Cláusulas Necessárias
+- NÃO deixar espaços em branco onde já temos as informações
+- Incluir Espaço Para Assinaturas Das Partes E Duas Testemunhas
+
+Gere O Contrato Completo Agora.`;
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -121,75 +140,93 @@ Gere o contrato completo agora.`;
 
 function gerarPDF(textoContrato) {
   return new Promise((resolve) => {
-    const doc = new PDFDocument({ margin: 60, size: 'A4' });
+    const doc = new PDFDocument({ margin: 70, size: 'A4' });
     const chunks = [];
 
     doc.on('data', chunk => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
 
+    const larguraPagina = doc.page.width - 140;
     const linhas = textoContrato.split('\n');
 
     for (const linha of linhas) {
       const trimmed = linha.trim();
-      if (!trimmed) { doc.moveDown(0.5); continue; }
+      if (!trimmed) { doc.moveDown(0.4); continue; }
+
+      // Pula marcações soltas
+      if (trimmed === '---' || trimmed === '--') { doc.moveDown(0.3); continue; }
 
       if (trimmed.startsWith('[TITULO]')) {
-        const texto = trimmed.replace('[TITULO]', '').replace('[/TITULO]', '');
+        const texto = trimmed.replace(/\[TITULO\]/g, '').replace(/\[\/TITULO\]/g, '').trim();
         doc.moveDown(0.5);
-        doc.fontSize(14).font('Helvetica-Bold').text(texto, { align: 'center' });
-        doc.moveDown(0.5);
+        doc.fontSize(13).font('Helvetica-Bold').text(texto, 70, doc.y, { align: 'center', width: larguraPagina });
+        doc.moveDown(0.8);
         continue;
       }
 
       if (trimmed.startsWith('[CLAUSULA]')) {
-        const texto = trimmed.replace('[CLAUSULA]', '').replace('[/CLAUSULA]', '');
-        doc.moveDown(0.5);
-        doc.fontSize(11).font('Helvetica-Bold').text(texto, { align: 'left' });
-        doc.moveDown(0.3);
+        const texto = trimmed.replace(/\[CLAUSULA\]/g, '').replace(/\[\/CLAUSULA\]/g, '').trim();
+        doc.moveDown(0.6);
+        doc.fontSize(10).font('Helvetica-Bold').text(texto, 70, doc.y, { align: 'left', width: larguraPagina });
+        doc.moveDown(0.4);
         continue;
       }
 
       if (trimmed.includes('[NEGRITO]')) {
         const partes = trimmed.split(/(\[NEGRITO\].*?\[\/NEGRITO\])/g);
-        let primeiro = true;
-        for (const parte of partes) {
+        doc.fontSize(10);
+        for (let i = 0; i < partes.length; i++) {
+          const parte = partes[i];
+          const isUltima = i === partes.length - 1;
           if (parte.startsWith('[NEGRITO]')) {
-            const texto = parte.replace('[NEGRITO]', '').replace('[/NEGRITO]', '');
-            doc.fontSize(10).font('Helvetica-Bold').text(texto, { continued: true });
+            const texto = parte.replace(/\[NEGRITO\]/g, '').replace(/\[\/NEGRITO\]/g, '');
+            doc.font('Helvetica-Bold').text(texto, { continued: !isUltima, lineGap: 2 });
           } else if (parte) {
-            doc.fontSize(10).font('Helvetica').text(parte, { continued: true });
+            doc.font('Helvetica').text(parte, { continued: !isUltima, lineGap: 2 });
           }
-          primeiro = false;
         }
-        doc.text('');
+        if (doc._continued) doc.text('');
         doc.moveDown(0.3);
         continue;
       }
 
-      doc.fontSize(10).font('Helvetica').text(trimmed, { align: 'justify', lineGap: 3 });
+      doc.fontSize(10).font('Helvetica').text(trimmed, 70, doc.y, {
+        align: 'justify',
+        width: larguraPagina,
+        lineGap: 2
+      });
       doc.moveDown(0.3);
     }
 
+    // Assinaturas
     doc.moveDown(2);
-    doc.fontSize(10).font('Helvetica').text('Local e Data: _________________________, _____ de _________________ de _______');
-    doc.moveDown(2);
-    doc.moveTo(60, doc.y).lineTo(270, doc.y).stroke();
-    doc.moveDown(0.3);
-    doc.text('Contratante', { align: 'left' });
-    doc.moveDown(2);
-    doc.moveTo(60, doc.y).lineTo(270, doc.y).stroke();
-    doc.moveDown(0.3);
-    doc.text('Contratado', { align: 'left' });
-    doc.moveDown(2);
-    doc.fontSize(9).font('Helvetica-Bold').text('TESTEMUNHAS:');
-    doc.moveDown(1);
-    doc.moveTo(60, doc.y).lineTo(250, doc.y).stroke();
-    doc.moveDown(0.3);
-    doc.fontSize(9).font('Helvetica').text('Testemunha 1: _____________________ CPF: _____________');
+    doc.fontSize(10).font('Helvetica').text(
+      'Local E Data: _________________________, _____ De _________________ De _______',
+      70, doc.y, { width: larguraPagina }
+    );
+    doc.moveDown(2.5);
+
+    const yAssinatura = doc.y;
+    doc.moveTo(70, yAssinatura).lineTo(280, yAssinatura).stroke();
+    doc.fontSize(9).font('Helvetica').text('Contratante / Locador / Vendedor', 70, yAssinatura + 5, { width: 210 });
+    doc.moveDown(2.5);
+
+    const yAssinatura2 = doc.y;
+    doc.moveTo(70, yAssinatura2).lineTo(280, yAssinatura2).stroke();
+    doc.fontSize(9).font('Helvetica').text('Contratado / Locatário / Comprador', 70, yAssinatura2 + 5, { width: 210 });
+    doc.moveDown(2.5);
+
+    doc.fontSize(9).font('Helvetica-Bold').text('Testemunhas:', 70, doc.y);
     doc.moveDown(1.5);
-    doc.moveTo(60, doc.y).lineTo(250, doc.y).stroke();
-    doc.moveDown(0.3);
-    doc.fontSize(9).font('Helvetica').text('Testemunha 2: _____________________ CPF: _____________');
+
+    const yT1 = doc.y;
+    doc.moveTo(70, yT1).lineTo(280, yT1).stroke();
+    doc.fontSize(9).font('Helvetica').text('Testemunha 1: _________________________  CPF: __________________', 70, yT1 + 5);
+    doc.moveDown(2);
+
+    const yT2 = doc.y;
+    doc.moveTo(70, yT2).lineTo(280, yT2).stroke();
+    doc.fontSize(9).font('Helvetica').text('Testemunha 2: _________________________  CPF: __________________', 70, yT2 + 5);
 
     doc.end();
   });
@@ -219,7 +256,7 @@ async function enviarPDF(phone, pdfBuffer, nomeArquivo) {
         mimetype: 'application/pdf',
         media: base64,
         fileName: nomeArquivo,
-        caption: '📄 Seu contrato está pronto! Abra o PDF para visualizar.'
+        caption: '📄 Seu Contrato Está Pronto! Abra O PDF Para Visualizar.'
       })
     });
   } catch (error) {
@@ -228,22 +265,22 @@ async function enviarPDF(phone, pdfBuffer, nomeArquivo) {
 }
 
 function menuPrincipal() {
-  return `Olá! 👋 Sou o *ContratoBot*, seu assistente de contratos profissionais! ⚖️
+  return `Olá! 👋 Sou O *ContratoBot*, Seu Assistente De Contratos Profissionais! ⚖️
 
-Gero contratos completos e personalizados em minutos!
+Gero Contratos Completos E Personalizados Em Minutos!
 
-⚠️ *Aviso importante:* Nossos contratos são gerados com base nas informações fornecidas e não substituem a assessoria de um advogado. Para situações complexas, recomendamos consultar um profissional jurídico.
+⚠️ *Aviso Importante:* Nossos Contratos São Gerados Com Base Nas Informações Fornecidas E Não Substituem A Assessoria De Um Advogado. Para Situações Complexas, Recomendamos Consultar Um Profissional Jurídico.
 
-Qual tipo de contrato você precisa?
+Qual Tipo De Contrato Você Precisa?
 
-1️⃣ Prestação de Serviços
-2️⃣ Aluguel de Imóvel
-3️⃣ Compra e Venda
-4️⃣ Contrato de Trabalho
+1️⃣ Prestação De Serviços
+2️⃣ Aluguel De Imóvel
+3️⃣ Compra E Venda
+4️⃣ Contrato De Trabalho
 5️⃣ Parceria / Sociedade
 6️⃣ Outro
 
-Responda com o número da opção desejada.`;
+Responda Com O Número Da Opção Desejada.`;
 }
 
 app.post('/webhook', async (req, res) => {
@@ -253,8 +290,6 @@ app.post('/webhook', async (req, res) => {
     const data = body.data;
     if (!data) return res.sendStatus(200);
     if (data.key && data.key.fromMe === true) return res.sendStatus(200);
-
-    // Ignora mensagens de sistema e protocolo
     if (data.message?.protocolMessage) return res.sendStatus(200);
     if (data.message?.documentMessage) return res.sendStatus(200);
     if (data.message?.documentWithCaptionMessage) return res.sendStatus(200);
@@ -276,7 +311,7 @@ app.post('/webhook', async (req, res) => {
         const tipo = TIPOS_CONTRATO[msg];
         usuario.contrato = { tipo, dados: [], perguntaAtual: 0 };
         usuario.etapa = 'coletando';
-        await enviarMensagem(phone, `Ótimo! Vou gerar seu contrato de *${tipo}*. 📋\n\nPreciso de algumas informações rápidas!\n\n*Pergunta 1 de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][0]}`);
+        await enviarMensagem(phone, `Ótimo! Vou Gerar Seu Contrato De *${tipo}*. 📋\n\nPreciso De Algumas Informações Rápidas!\n\n*Pergunta 1 De ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][0]}`);
       } else {
         await enviarMensagem(phone, menuPrincipal());
       }
@@ -290,16 +325,16 @@ app.post('/webhook', async (req, res) => {
 
       if (proxima < PERGUNTAS[tipo].length) {
         usuario.contrato.perguntaAtual = proxima;
-        await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][proxima]}`);
+        await enviarMensagem(phone, `*Pergunta ${proxima + 1} De ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][proxima]}`);
       } else {
         usuario.etapa = 'gerando';
-        await enviarMensagem(phone, `Perfeito! Tenho todas as informações. ✅\n\nGerando seu contrato em PDF, aguarde um instante... ⏳`);
+        await enviarMensagem(phone, `Perfeito! Tenho Todas As Informações. ✅\n\nGerando Seu Contrato Em PDF, Aguarde Um Instante... ⏳`);
         const textoContrato = await gerarContrato(tipo, dados);
         usuario.contrato.texto = textoContrato;
         const pdfBuffer = await gerarPDF(textoContrato);
         const nomeArquivo = `Contrato_${tipo.replace(/ /g, '_')}.pdf`;
         await enviarPDF(phone, pdfBuffer, nomeArquivo);
-        await enviarMensagem(phone, `✅ *Contrato gerado com sucesso!*\n\nDeseja alguma *alteração*? Me diga o que mudar que refaço na hora! 😊\n\nOu digite *NOVO* para gerar outro contrato.`);
+        await enviarMensagem(phone, `✅ *Contrato Gerado Com Sucesso!*\n\nDeseja Alguma *Alteração*? Me Diga O Que Mudar Que Refaço Na Hora! 😊\n\nOu Digite *NOVO* Para Gerar Outro Contrato.`);
         usuario.etapa = 'revisao';
       }
       return res.sendStatus(200);
@@ -313,17 +348,16 @@ app.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
       }
 
-      // Ignora mensagens muito curtas que podem ser reações ou notificações
       if (msg.length < 3) return res.sendStatus(200);
 
-      await enviarMensagem(phone, `Entendido! Aplicando as modificações e gerando novo PDF... ⏳`);
+      await enviarMensagem(phone, `Entendido! Aplicando As Modificações E Gerando Novo PDF... ⏳`);
       const atualizado = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 4000,
         messages: [
-          { role: 'user', content: `Aqui está um contrato:\n\n${usuario.contrato.texto}` },
+          { role: 'user', content: `Aqui Está Um Contrato:\n\n${usuario.contrato.texto}` },
           { role: 'assistant', content: usuario.contrato.texto },
-          { role: 'user', content: `Faça as seguintes modificações: ${msg}\n\nRetorne o contrato completo com as modificações, usando as mesmas marcações [TITULO], [CLAUSULA] e [NEGRITO].` }
+          { role: 'user', content: `Faça As Seguintes Modificações: ${msg}\n\nRetorne O Contrato Completo Com As Modificações, Usando As Mesmas Marcações [TITULO], [CLAUSULA] E [NEGRITO]. Mantenha Todas As Palavras Com Primeira Letra Em Maiúsculo.` }
         ]
       });
 
@@ -331,7 +365,7 @@ app.post('/webhook', async (req, res) => {
       const pdfBuffer = await gerarPDF(usuario.contrato.texto);
       const nomeArquivo = `Contrato_${usuario.contrato.tipo.replace(/ /g, '_')}_atualizado.pdf`;
       await enviarPDF(phone, pdfBuffer, nomeArquivo);
-      await enviarMensagem(phone, `✅ *Contrato atualizado!*\n\nDeseja mais alguma *alteração*? Ou digite *NOVO* para gerar outro contrato.`);
+      await enviarMensagem(phone, `✅ *Contrato Atualizado!*\n\nDeseja Mais Alguma *Alteração*? Ou Digite *NOVO* Para Gerar Outro Contrato.`);
       return res.sendStatus(200);
     }
 
@@ -341,6 +375,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => { res.json({ status: 'ContratoBot rodando!' }); });
+app.get('/', (req, res) => { res.json({ status: 'ContratoBot Rodando!' }); });
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log('ContratoBot rodando na porta ' + PORT); });
+app.listen(PORT, () => { console.log('ContratoBot Rodando Na Porta ' + PORT); });
