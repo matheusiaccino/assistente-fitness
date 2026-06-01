@@ -127,17 +127,12 @@ function gerarPDF(textoContrato) {
     doc.on('data', chunk => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-    // Divide o texto em linhas
     const linhas = textoContrato.split('\n');
 
     for (const linha of linhas) {
       const trimmed = linha.trim();
-      if (!trimmed) {
-        doc.moveDown(0.5);
-        continue;
-      }
+      if (!trimmed) { doc.moveDown(0.5); continue; }
 
-      // Título principal
       if (trimmed.startsWith('[TITULO]')) {
         const texto = trimmed.replace('[TITULO]', '').replace('[/TITULO]', '');
         doc.moveDown(0.5);
@@ -146,7 +141,6 @@ function gerarPDF(textoContrato) {
         continue;
       }
 
-      // Título de cláusula
       if (trimmed.startsWith('[CLAUSULA]')) {
         const texto = trimmed.replace('[CLAUSULA]', '').replace('[/CLAUSULA]', '');
         doc.moveDown(0.5);
@@ -155,63 +149,47 @@ function gerarPDF(textoContrato) {
         continue;
       }
 
-      // Linha com negrito inline
       if (trimmed.includes('[NEGRITO]')) {
-        doc.fontSize(10).font('Helvetica');
         const partes = trimmed.split(/(\[NEGRITO\].*?\[\/NEGRITO\])/g);
-        let x = doc.x;
-        let primeiraLinha = true;
-
+        let primeiro = true;
         for (const parte of partes) {
           if (parte.startsWith('[NEGRITO]')) {
             const texto = parte.replace('[NEGRITO]', '').replace('[/NEGRITO]', '');
-            if (primeiraLinha) {
-              doc.font('Helvetica-Bold').text(texto, { continued: true });
-              primeiraLinha = false;
-            } else {
-              doc.font('Helvetica-Bold').text(texto, { continued: true });
-            }
+            doc.fontSize(10).font('Helvetica-Bold').text(texto, { continued: true });
           } else if (parte) {
-            doc.font('Helvetica').text(parte, { continued: true });
+            doc.fontSize(10).font('Helvetica').text(parte, { continued: true });
           }
+          primeiro = false;
         }
-        doc.text(''); // Finaliza a linha
+        doc.text('');
         doc.moveDown(0.3);
         continue;
       }
 
-      // Texto normal
-      doc.fontSize(10).font('Helvetica').text(trimmed, {
-        align: 'justify',
-        lineGap: 3
-      });
+      doc.fontSize(10).font('Helvetica').text(trimmed, { align: 'justify', lineGap: 3 });
       doc.moveDown(0.3);
     }
 
-    // Espaço para assinaturas
     doc.moveDown(2);
-    doc.fontSize(10).font('Helvetica');
-    doc.text('Local e Data: _________________________, _____ de _________________ de _______', { align: 'left' });
+    doc.fontSize(10).font('Helvetica').text('Local e Data: _________________________, _____ de _________________ de _______');
     doc.moveDown(2);
-
-    // Linha assinatura parte 1
     doc.moveTo(60, doc.y).lineTo(270, doc.y).stroke();
-    doc.text('Contratante', 60, doc.y + 5);
+    doc.moveDown(0.3);
+    doc.text('Contratante', { align: 'left' });
     doc.moveDown(2);
-
-    // Linha assinatura parte 2
     doc.moveTo(60, doc.y).lineTo(270, doc.y).stroke();
-    doc.text('Contratado', 60, doc.y + 5);
+    doc.moveDown(0.3);
+    doc.text('Contratado', { align: 'left' });
     doc.moveDown(2);
-
-    // Testemunhas
-    doc.fontSize(9).font('Helvetica-Bold').text('TESTEMUNHAS:', { align: 'left' });
+    doc.fontSize(9).font('Helvetica-Bold').text('TESTEMUNHAS:');
     doc.moveDown(1);
     doc.moveTo(60, doc.y).lineTo(250, doc.y).stroke();
-    doc.fontSize(9).font('Helvetica').text('Testemunha 1: _____________________ CPF: _____________', 60, doc.y + 5);
+    doc.moveDown(0.3);
+    doc.fontSize(9).font('Helvetica').text('Testemunha 1: _____________________ CPF: _____________');
     doc.moveDown(1.5);
     doc.moveTo(60, doc.y).lineTo(250, doc.y).stroke();
-    doc.fontSize(9).font('Helvetica').text('Testemunha 2: _____________________ CPF: _____________', 60, doc.y + 5);
+    doc.moveDown(0.3);
+    doc.fontSize(9).font('Helvetica').text('Testemunha 2: _____________________ CPF: _____________');
 
     doc.end();
   });
@@ -275,8 +253,17 @@ app.post('/webhook', async (req, res) => {
     const data = body.data;
     if (!data) return res.sendStatus(200);
     if (data.key && data.key.fromMe === true) return res.sendStatus(200);
+
+    // Ignora mensagens de sistema e protocolo
+    if (data.message?.protocolMessage) return res.sendStatus(200);
+    if (data.message?.documentMessage) return res.sendStatus(200);
+    if (data.message?.documentWithCaptionMessage) return res.sendStatus(200);
+    if (data.messageType === 'protocolMessage') return res.sendStatus(200);
+    if (data.messageType === 'senderKeyDistributionMessage') return res.sendStatus(200);
+
     const texto = (data.message && (data.message.conversation || (data.message.extendedTextMessage && data.message.extendedTextMessage.text))) || '';
     if (!texto.trim()) return res.sendStatus(200);
+
     const phone = data.key && data.key.remoteJid && data.key.remoteJid.replace('@s.whatsapp.net', '');
     if (!phone) return res.sendStatus(200);
 
@@ -307,16 +294,12 @@ app.post('/webhook', async (req, res) => {
       } else {
         usuario.etapa = 'gerando';
         await enviarMensagem(phone, `Perfeito! Tenho todas as informações. ✅\n\nGerando seu contrato em PDF, aguarde um instante... ⏳`);
-
         const textoContrato = await gerarContrato(tipo, dados);
         usuario.contrato.texto = textoContrato;
-
         const pdfBuffer = await gerarPDF(textoContrato);
         const nomeArquivo = `Contrato_${tipo.replace(/ /g, '_')}.pdf`;
-
         await enviarPDF(phone, pdfBuffer, nomeArquivo);
         await enviarMensagem(phone, `✅ *Contrato gerado com sucesso!*\n\nDeseja alguma *alteração*? Me diga o que mudar que refaço na hora! 😊\n\nOu digite *NOVO* para gerar outro contrato.`);
-
         usuario.etapa = 'revisao';
       }
       return res.sendStatus(200);
@@ -330,8 +313,10 @@ app.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
       }
 
-      await enviarMensagem(phone, `Entendido! Aplicando as modificações e gerando novo PDF... ⏳`);
+      // Ignora mensagens muito curtas que podem ser reações ou notificações
+      if (msg.length < 3) return res.sendStatus(200);
 
+      await enviarMensagem(phone, `Entendido! Aplicando as modificações e gerando novo PDF... ⏳`);
       const atualizado = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 4000,
@@ -345,7 +330,6 @@ app.post('/webhook', async (req, res) => {
       usuario.contrato.texto = atualizado.content[0].text;
       const pdfBuffer = await gerarPDF(usuario.contrato.texto);
       const nomeArquivo = `Contrato_${usuario.contrato.tipo.replace(/ /g, '_')}_atualizado.pdf`;
-
       await enviarPDF(phone, pdfBuffer, nomeArquivo);
       await enviarMensagem(phone, `✅ *Contrato atualizado!*\n\nDeseja mais alguma *alteração*? Ou digite *NOVO* para gerar outro contrato.`);
       return res.sendStatus(200);
