@@ -306,15 +306,39 @@ async function gerarWord(textoContrato) {
 
 async function enviarMensagem(phone, mensagem) {
   try {
-    await fetch(process.env.EVOLUTION_URL + '/message/sendText/' + process.env.EVOLUTION_INSTANCE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': process.env.EVOLUTION_KEY },
-      body: JSON.stringify({ number: phone, text: mensagem })
-    });
+    const response = await fetch(
+      process.env.EVOLUTION_URL + '/message/sendText/' + process.env.EVOLUTION_INSTANCE,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: process.env.EVOLUTION_KEY
+        },
+        body: JSON.stringify({
+          number: phone,
+          text: mensagem
+        })
+      }
+    );
+
+    const resposta = await response.text();
+
+    console.log('====================================');
+    console.log('ENVIO DE MENSAGEM');
+    console.log('Número:', phone);
+    console.log('Status HTTP:', response.status);
+    console.log('Resposta Evolution:', resposta);
+    console.log('====================================');
+
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status}: ${resposta}`);
+    }
+
+    return true;
   } catch (error) {
-    console.error('Erro ao enviar mensagem:', error);
+    console.error('ERRO AO ENVIAR MENSAGEM:', error);
+    return false;
   }
-}
 
 async function enviarArquivo(phone, buffer, nomeArquivo, mimetype, caption) {
   try {
