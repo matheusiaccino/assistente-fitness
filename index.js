@@ -685,4 +685,6 @@ app.get('/avaliacoes', (req, res) => {
 
 app.get('/', (req, res) => { res.json({ status: 'ContratoBot rodando!' }); });
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log('ContratoBot rodando na porta ' + PORT); });
+app.listen(PORT, () => {
+  console.log('ContratoBot rodando na porta ' + PORT);
+});
