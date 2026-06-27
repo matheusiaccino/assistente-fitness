@@ -3,6 +3,7 @@ const app = express();
 app.use(express.json());
 const Anthropic = require('@anthropic-ai/sdk');
 const PDFDocument = require('pdfkit');
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const usuarios = {};
@@ -11,7 +12,7 @@ const avaliacoes = [];
 
 function getUsuario(phone) {
   if (!usuarios[phone]) {
-    usuarios[phone] = { etapa: 'menu', plano: null, creditos: 0, contrato: {} };
+    usuarios[phone] = { etapa: 'menu', plano: null, creditos: 0, contrato: {}, dataExpiracao: null };
   }
   return usuarios[phone];
 }
@@ -21,6 +22,13 @@ function isDuplicata(phone, texto) {
   const chave = phone + '|' + texto;
   if (ultimasMensagens[chave] && (agora - ultimasMensagens[chave]) < 10000) return true;
   ultimasMensagens[chave] = agora;
+  return false;
+}
+
+function planoExpirado(usuario) {
+  if (usuario.plano === 'ilimitado' && usuario.dataExpiracao) {
+    return Date.now() > usuario.dataExpiracao;
+  }
   return false;
 }
 
@@ -72,9 +80,8 @@ const PERGUNTAS = {
   'Contrato de Trabalho': [
     'Qual o nome e CNPJ da empresa contratante?',
     'Qual o nome completo e CPF do funcionário?',
-    'Qual a função ou cargo?',
-    'Qual o salário combinado?',
     'Qual a carga horária semanal?',
+    'Qual o salário combinado?',
     'Qual a data de início?',
     'É CLT, PJ ou contrato de experiência?',
     'Quais benefícios? (VT, VR, plano de saúde, etc)',
@@ -227,6 +234,75 @@ function gerarPDF(textoContrato) {
   });
 }
 
+async function gerarWord(textoContrato) {
+  const linhas = textoContrato.split('\n');
+  const paragrafos = [];
+
+  for (const linha of linhas) {
+    const trimmed = linha.trim();
+    if (!trimmed || trimmed === '---' || trimmed === '--') {
+      paragrafos.push(new Paragraph({ text: '' }));
+      continue;
+    }
+
+    if (trimmed.startsWith('[TITULO]')) {
+      const texto = trimmed.replace(/\[TITULO\]/g, '').replace(/\[\/TITULO\]/g, '').trim();
+      paragrafos.push(new Paragraph({
+        children: [new TextRun({ text: texto, bold: true, size: 28 })],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 }
+      }));
+      continue;
+    }
+
+    if (trimmed.startsWith('[CLAUSULA]')) {
+      const texto = trimmed.replace(/\[CLAUSULA\]/g, '').replace(/\[\/CLAUSULA\]/g, '').trim();
+      paragrafos.push(new Paragraph({
+        children: [new TextRun({ text: texto, bold: true, size: 22 })],
+        spacing: { before: 200, after: 100 }
+      }));
+      continue;
+    }
+
+    if (trimmed.includes('[NEGRITO]')) {
+      const partes = trimmed.split(/(\[NEGRITO\].*?\[\/NEGRITO\])/g);
+      const runs = partes.map(parte => {
+        if (parte.startsWith('[NEGRITO]')) {
+          const texto = parte.replace(/\[NEGRITO\]/g, '').replace(/\[\/NEGRITO\]/g, '');
+          return new TextRun({ text: texto, bold: true, size: 20 });
+        }
+        return new TextRun({ text: parte, size: 20 });
+      });
+      paragrafos.push(new Paragraph({ children: runs, alignment: AlignmentType.JUSTIFIED, spacing: { after: 80 } }));
+      continue;
+    }
+
+    paragrafos.push(new Paragraph({
+      children: [new TextRun({ text: trimmed, size: 20 })],
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 80 }
+    }));
+  }
+
+  paragrafos.push(new Paragraph({ text: '', spacing: { before: 400 } }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Local e Data: _________________________, _____ de _________________ de _______', size: 20 })] }));
+  paragrafos.push(new Paragraph({ text: '', spacing: { before: 400 } }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: '________________________________________', size: 20 })] }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Contratante / Locador / Vendedor', size: 20 })] }));
+  paragrafos.push(new Paragraph({ text: '', spacing: { before: 400 } }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: '________________________________________', size: 20 })] }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Contratado / Locatário / Comprador', size: 20 })] }));
+  paragrafos.push(new Paragraph({ text: '', spacing: { before: 400 } }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Testemunhas:', bold: true, size: 20 })] }));
+  paragrafos.push(new Paragraph({ text: '', spacing: { before: 200 } }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Testemunha 1: _________________________  CPF: __________________', size: 20 })] }));
+  paragrafos.push(new Paragraph({ text: '', spacing: { before: 200 } }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Testemunha 2: _________________________  CPF: __________________', size: 20 })] }));
+
+  const doc = new Document({ sections: [{ properties: {}, children: paragrafos }] });
+  return await Packer.toBuffer(doc);
+}
+
 async function enviarMensagem(phone, mensagem) {
   try {
     await fetch(process.env.EVOLUTION_URL + '/message/sendText/' + process.env.EVOLUTION_INSTANCE, {
@@ -239,27 +315,22 @@ async function enviarMensagem(phone, mensagem) {
   }
 }
 
-async function enviarPDF(phone, pdfBuffer, nomeArquivo) {
+async function enviarArquivo(phone, buffer, nomeArquivo, mimetype, caption) {
   try {
-    const base64 = pdfBuffer.toString('base64');
+    const base64 = buffer.toString('base64');
     await fetch(process.env.EVOLUTION_URL + '/message/sendMedia/' + process.env.EVOLUTION_INSTANCE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': process.env.EVOLUTION_KEY },
-      body: JSON.stringify({
-        number: phone,
-        mediatype: 'document',
-        mimetype: 'application/pdf',
-        media: base64,
-        fileName: nomeArquivo,
-        caption: '📄 Seu contrato está pronto! Abra o PDF para visualizar.'
-      })
+      body: JSON.stringify({ number: phone, mediatype: 'document', mimetype, media: base64, fileName: nomeArquivo, caption })
     });
   } catch (error) {
-    console.error('Erro ao enviar PDF:', error);
+    console.error('Erro ao enviar arquivo:', error);
   }
 }
 
 function menuPrincipal(temAcesso) {
+  const dicas = `\n\n💡 *Comandos disponíveis a qualquer momento:*\n• Digite *SUPORTE* — para falar com nossa equipe\n• Digite *CANCELAR PLANO* — para cancelar sua assinatura\n• Digite *MENU* — para voltar ao menu principal`;
+
   if (temAcesso) {
     return `Qual tipo de contrato você precisa? ⚖️
 
@@ -270,12 +341,12 @@ function menuPrincipal(temAcesso) {
 5️⃣ Parceria / Sociedade
 6️⃣ Outro
 
-Responda com o número da opção desejada.`;
+Responda com o número da opção desejada.${dicas}`;
   }
 
   return `Olá! 👋 Sou o *ContratoBot*, seu assistente de contratos profissionais! ⚖️
 
-Gero contratos completos e personalizados em minutos!
+Gero contratos completos e personalizados em minutos, por uma fração do custo de um advogado!
 
 ⚠️ *Aviso importante:* Nossos contratos são gerados com base nas informações fornecidas e não substituem a assessoria de um advogado.
 
@@ -285,9 +356,17 @@ Gero contratos completos e personalizados em minutos!
 Um contrato completo com direito a modificações
 
 *2️⃣ Plano Ilimitado — R$ 49,99/mês*
-Contratos ilimitados durante 30 dias ♾️
+Contratos ilimitados com renovação automática ♾️
+Cancele quando quiser digitando *CANCELAR PLANO*${dicas}
 
 Responda *1* ou *2* para continuar.`;
+}
+
+function pedirFormato() {
+  return `Em qual formato você prefere receber o contrato?
+
+1️⃣ PDF (recomendado para assinar)
+2️⃣ Word (.docx) (para editar antes de assinar)`;
 }
 
 function pedirAvaliacao() {
@@ -324,17 +403,51 @@ app.post('/webhook', async (req, res) => {
 
     const phone = data.key && data.key.remoteJid && data.key.remoteJid.replace('@s.whatsapp.net', '');
     if (!phone) return res.sendStatus(200);
-
     if (isDuplicata(phone, texto)) return res.sendStatus(200);
 
     const usuario = getUsuario(phone);
     const msg = texto.trim();
+    const msgUpper = msg.toUpperCase();
     console.log('Mensagem de', phone, ':', msg, '| Etapa:', usuario.etapa);
 
     if (usuario.etapa === 'gerando') return res.sendStatus(200);
 
-    // Sem acesso — mostrar planos
-    if (!usuario.plano && usuario.creditos === 0 && usuario.etapa !== 'avaliacao') {
+    // Verifica expiração
+    if (planoExpirado(usuario)) {
+      usuario.plano = null;
+      usuario.creditos = 0;
+      usuario.dataExpiracao = null;
+      await enviarMensagem(phone, `⚠️ Seu *Plano Ilimitado* expirou!\n\nPara continuar gerando contratos escolha um novo plano:\n\n${menuPrincipal(false)}`);
+      return res.sendStatus(200);
+    }
+
+    // MENU — volta ao menu em qualquer etapa
+    if (msgUpper === 'MENU') {
+      usuario.etapa = 'menu';
+      usuario.contrato = {};
+      const temAcesso = usuario.plano || usuario.creditos > 0;
+      await enviarMensagem(phone, menuPrincipal(!!temAcesso));
+      return res.sendStatus(200);
+    }
+
+    // SUPORTE — funciona em qualquer etapa
+    if (msgUpper === 'SUPORTE') {
+      await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe de suporte:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.`);
+      return res.sendStatus(200);
+    }
+
+    // CANCELAR PLANO — funciona em qualquer etapa
+    if (msgUpper === 'CANCELAR PLANO') {
+      if (usuario.plano === 'ilimitado') {
+        await enviarMensagem(phone, `😢 Que pena que deseja cancelar seu plano!\n\nSua assinatura possui *renovação automática mensal*. Para cancelar e não ser cobrado no próximo mês, acesse o link abaixo:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nVocê continuará tendo acesso até o final do período já pago.\n\nSe tiver algum problema, entre em contato com nosso suporte:\n📧 contratobotsuporte@gmail.com`);
+      } else {
+        await enviarMensagem(phone, `Você não possui uma assinatura ativa no momento. 😊\n\nSe precisar de ajuda digite *SUPORTE*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    // Sem acesso
+    if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario'].includes(usuario.etapa)) {
       if (msg === '1') {
         await enviarMensagem(phone, `Ótimo! Acesse o link abaixo para realizar o pagamento de *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente aqui no WhatsApp! ✅`);
       } else if (msg === '2') {
@@ -349,6 +462,7 @@ app.post('/webhook', async (req, res) => {
     if (usuario.etapa === 'avaliacao') {
       const nota = parseInt(msg);
       if (nota >= 1 && nota <= 5) {
+        usuario.ultimaNota = nota;
         usuario.etapa = 'comentario';
         const estrelas = '⭐'.repeat(nota);
         await enviarMensagem(phone, `${estrelas} Obrigado pela avaliação!\n\nTem algum elogio, crítica ou sugestão? (opcional)\n\nOu digite *PULAR* para encerrar.`);
@@ -359,11 +473,39 @@ app.post('/webhook', async (req, res) => {
     }
 
     if (usuario.etapa === 'comentario') {
-      const comentario = msg.toUpperCase() === 'PULAR' ? '' : msg;
+      const comentario = msgUpper === 'PULAR' ? '' : msg;
       avaliacoes.push({ phone, nota: usuario.ultimaNota, comentario, data: new Date().toISOString() });
-      console.log('Avaliação recebida:', { phone, comentario });
       usuario.etapa = 'menu';
       await enviarMensagem(phone, `Muito obrigado pelo feedback! 😊\n\nVolte sempre que precisar de um contrato. Até logo! 👋`);
+      return res.sendStatus(200);
+    }
+
+    // Escolha de formato
+    if (usuario.etapa === 'formato') {
+      if (msg === '1' || msg === '2') {
+        const formato = msg === '1' ? 'pdf' : 'word';
+        usuario.etapa = 'gerando';
+        await enviarMensagem(phone, `Gerando seu contrato em ${formato === 'pdf' ? 'PDF' : 'Word'}... ⏳`);
+
+        const tipo = usuario.contrato.tipo;
+        if (formato === 'pdf') {
+          const pdfBuffer = await gerarPDF(usuario.contrato.texto);
+          await enviarArquivo(phone, pdfBuffer, `Contrato_${tipo.replace(/ /g, '_')}.pdf`, 'application/pdf', '📄 Seu contrato em PDF está pronto!');
+        } else {
+          const wordBuffer = await gerarWord(usuario.contrato.texto);
+          await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
+        }
+
+        await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nDeseja alguma *alteração*? Me diga o que mudar que refaço na hora! 😊\n\nOu digite *NOVO* para gerar outro contrato.`);
+        usuario.etapa = 'revisao';
+
+        if (usuario.plano === 'avulso') {
+          usuario.creditos = 0;
+          usuario.plano = null;
+        }
+      } else {
+        await enviarMensagem(phone, pedirFormato());
+      }
       return res.sendStatus(200);
     }
 
@@ -391,36 +533,37 @@ app.post('/webhook', async (req, res) => {
         await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][proxima]}`);
       } else {
         usuario.etapa = 'gerando';
-        await enviarMensagem(phone, `Perfeito! Tenho todas as informações. ✅\n\nGerando seu contrato em PDF, aguarde um instante... ⏳`);
+        await enviarMensagem(phone, `Perfeito! Tenho todas as informações. ✅\n\nGerando seu contrato, aguarde um instante... ⏳`);
         const textoContrato = await gerarContrato(tipo, dados);
         usuario.contrato.texto = textoContrato;
-        const pdfBuffer = await gerarPDF(textoContrato);
-        const nomeArquivo = `Contrato_${tipo.replace(/ /g, '_')}.pdf`;
-        await enviarPDF(phone, pdfBuffer, nomeArquivo);
-        await enviarMensagem(phone, `✅ *Contrato gerado com sucesso!*\n\nDeseja alguma *alteração*? Me diga o que mudar que refaço na hora! 😊\n\nOu digite *NOVO* para gerar outro contrato.`);
-        usuario.etapa = 'revisao';
-
-        // Desconta crédito se for avulso
-        if (usuario.plano === 'avulso') {
-          usuario.creditos = 0;
-          usuario.plano = null;
-        }
+        usuario.etapa = 'formato';
+        await enviarMensagem(phone, pedirFormato());
       }
       return res.sendStatus(200);
     }
 
     // Revisão
     if (usuario.etapa === 'revisao') {
-      if (msg.toUpperCase() === 'NOVO') {
+      if (msgUpper === 'NOVO') {
         usuario.etapa = 'avaliacao';
+        usuario.contrato = {};
         await enviarMensagem(phone, pedirAvaliacao());
         return res.sendStatus(200);
       }
 
       if (msg.length < 5) return res.sendStatus(200);
 
+      // Proteção contra uso indevido
+      const palavrasNovoContrato = ['quero um contrato', 'novo contrato', 'fazer contrato', 'preciso de um contrato', 'gerar contrato'];
+      const parecePedidoNovo = palavrasNovoContrato.some(p => msg.toLowerCase().includes(p));
+
+      if (parecePedidoNovo) {
+        await enviarMensagem(phone, `Para gerar um *novo contrato* diferente deste, digite *NOVO*.\n\nSe quiser fazer uma alteração no contrato atual, me diga exatamente o que mudar! 😊`);
+        return res.sendStatus(200);
+      }
+
       usuario.etapa = 'gerando';
-      await enviarMensagem(phone, `Entendido! Aplicando as modificações e gerando novo PDF... ⏳`);
+      await enviarMensagem(phone, `Entendido! Aplicando as modificações... ⏳`);
       const atualizado = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 4000,
@@ -432,11 +575,8 @@ app.post('/webhook', async (req, res) => {
       });
 
       usuario.contrato.texto = atualizado.content[0].text;
-      const pdfBuffer = await gerarPDF(usuario.contrato.texto);
-      const nomeArquivo = `Contrato_${usuario.contrato.tipo.replace(/ /g, '_')}_atualizado.pdf`;
-      await enviarPDF(phone, pdfBuffer, nomeArquivo);
-      await enviarMensagem(phone, `✅ *Contrato atualizado!*\n\nDeseja mais alguma *alteração*? Ou digite *NOVO* para gerar outro contrato.`);
-      usuario.etapa = 'revisao';
+      usuario.etapa = 'formato';
+      await enviarMensagem(phone, `✅ Modificações aplicadas!\n\n${pedirFormato()}`);
       return res.sendStatus(200);
     }
 
@@ -446,40 +586,51 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Webhook do Kiwify
+// Webhook Kiwify
 app.post('/kiwify', (req, res) => {
   try {
-    console.log('Kiwify webhook:', JSON.stringify(req.body).substring(0, 500));
     const body = req.body;
-
-    if (body.order_status !== 'paid') return res.sendStatus(200);
+    console.log('Kiwify webhook:', JSON.stringify(body).substring(0, 500));
 
     const token = req.query.token || body.token;
-    if (token !== process.env.KIWIFY_TOKEN) {
+    const tokensValidos = (process.env.KIWIFY_TOKEN || '').split(',');
+    if (!tokensValidos.includes(token)) {
       console.log('Token inválido:', token);
       return res.status(401).json({ error: 'Token inválido' });
     }
 
     const phone = body.Customer?.mobile?.replace(/\D/g, '');
-    if (!phone) {
-      console.log('Telefone não encontrado no webhook');
+    if (!phone) return res.sendStatus(200);
+
+    const usuario = getUsuario(phone);
+    const status = body.order_status || body.subscription_status;
+
+    // Cancelamento
+    if (status === 'canceled' || status === 'cancelled') {
+      usuario.plano = null;
+      usuario.creditos = 0;
+      usuario.dataExpiracao = null;
+      enviarMensagem(phone, `😢 Sua assinatura foi cancelada com sucesso.\n\nSeu acesso permanece ativo até o final do período pago.\n\nSe quiser voltar, é só escolher um novo plano:\n\n${menuPrincipal(false)}`);
       return res.sendStatus(200);
     }
 
-    const usuario = getUsuario(phone);
+    if (status !== 'paid') return res.sendStatus(200);
+
     const preco = body.Product?.price || 0;
 
     if (preco <= 1999) {
       usuario.plano = 'avulso';
       usuario.creditos = 1;
+      usuario.dataExpiracao = null;
     } else {
+      // Renova os 30 dias a cada pagamento
       usuario.plano = 'ilimitado';
       usuario.creditos = 999;
+      usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
     }
 
     usuario.etapa = 'menu';
-    console.log('Acesso liberado:', phone, '| Plano:', usuario.plano);
-
+    console.log('Acesso liberado/renovado:', phone, '| Plano:', usuario.plano);
     enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(true)}`);
     res.sendStatus(200);
   } catch (error) {
@@ -488,7 +639,6 @@ app.post('/kiwify', (req, res) => {
   }
 });
 
-// Ver avaliações
 app.get('/avaliacoes', (req, res) => {
   const media = avaliacoes.length > 0
     ? (avaliacoes.reduce((a, b) => a + b.nota, 0) / avaliacoes.length).toFixed(1)
