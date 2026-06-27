@@ -629,6 +629,29 @@ app.post('/kiwify', (req, res) => {
   }
 });
 
+// Rota de teste — remover antes de ir ao ar oficial
+app.get('/teste', (req, res) => {
+  const { phone, plano, senha } = req.query;
+  if (senha !== 'matheus123') return res.status(401).json({ error: 'Senha inválida' });
+  if (!phone) return res.status(400).json({ error: 'Phone obrigatório' });
+
+  const usuario = getUsuario(phone);
+
+  if (plano === 'ilimitado') {
+    usuario.plano = 'ilimitado';
+    usuario.creditos = 999;
+    usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
+  } else {
+    usuario.plano = 'avulso';
+    usuario.creditos = 1;
+    usuario.dataExpiracao = null;
+  }
+
+  usuario.etapa = 'menu';
+  enviarMensagem(phone, `🎉 *Acesso de teste liberado!*\n\n${menuPrincipal(true)}`);
+  res.json({ success: true, phone, plano: usuario.plano });
+});
+
 app.get('/avaliacoes', (req, res) => {
   const media = avaliacoes.length > 0
     ? (avaliacoes.reduce((a, b) => a + b.nota, 0) / avaliacoes.length).toFixed(1)
