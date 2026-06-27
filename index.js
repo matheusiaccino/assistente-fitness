@@ -80,8 +80,9 @@ const PERGUNTAS = {
   'Contrato de Trabalho': [
     'Qual o nome e CNPJ da empresa contratante?',
     'Qual o nome completo e CPF do funcionário?',
-    'Qual a carga horária semanal?',
+    'Qual a função ou cargo?',
     'Qual o salário combinado?',
+    'Qual a carga horária semanal?',
     'Qual a data de início?',
     'É CLT, PJ ou contrato de experiência?',
     'Quais benefícios? (VT, VR, plano de saúde, etc)',
@@ -412,7 +413,6 @@ app.post('/webhook', async (req, res) => {
 
     if (usuario.etapa === 'gerando') return res.sendStatus(200);
 
-    // Verifica expiração
     if (planoExpirado(usuario)) {
       usuario.plano = null;
       usuario.creditos = 0;
@@ -421,7 +421,6 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // MENU — volta ao menu em qualquer etapa
     if (msgUpper === 'MENU') {
       usuario.etapa = 'menu';
       usuario.contrato = {};
@@ -430,23 +429,20 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // SUPORTE — funciona em qualquer etapa
     if (msgUpper === 'SUPORTE') {
-      await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe de suporte:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.`);
+      await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.`);
       return res.sendStatus(200);
     }
 
-    // CANCELAR PLANO — funciona em qualquer etapa
     if (msgUpper === 'CANCELAR PLANO') {
       if (usuario.plano === 'ilimitado') {
-        await enviarMensagem(phone, `😢 Que pena que deseja cancelar seu plano!\n\nSua assinatura possui *renovação automática mensal*. Para cancelar e não ser cobrado no próximo mês, acesse o link abaixo:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nVocê continuará tendo acesso até o final do período já pago.\n\nSe tiver algum problema, entre em contato com nosso suporte:\n📧 contratobotsuporte@gmail.com`);
+        await enviarMensagem(phone, `😢 Que pena que deseja cancelar seu plano!\n\nSua assinatura possui *renovação automática mensal*. Para cancelar e não ser cobrado no próximo mês, entre em contato com nosso suporte:\n\n📧 contratobotsuporte@gmail.com\n\nVocê continuará tendo acesso até o final do período já pago.`);
       } else {
         await enviarMensagem(phone, `Você não possui uma assinatura ativa no momento. 😊\n\nSe precisar de ajuda digite *SUPORTE*.`);
       }
       return res.sendStatus(200);
     }
 
-    // Sem acesso
     if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario'].includes(usuario.etapa)) {
       if (msg === '1') {
         await enviarMensagem(phone, `Ótimo! Acesse o link abaixo para realizar o pagamento de *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente aqui no WhatsApp! ✅`);
@@ -458,7 +454,6 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Avaliação
     if (usuario.etapa === 'avaliacao') {
       const nota = parseInt(msg);
       if (nota >= 1 && nota <= 5) {
@@ -480,13 +475,11 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Escolha de formato
     if (usuario.etapa === 'formato') {
       if (msg === '1' || msg === '2') {
         const formato = msg === '1' ? 'pdf' : 'word';
         usuario.etapa = 'gerando';
         await enviarMensagem(phone, `Gerando seu contrato em ${formato === 'pdf' ? 'PDF' : 'Word'}... ⏳`);
-
         const tipo = usuario.contrato.tipo;
         if (formato === 'pdf') {
           const pdfBuffer = await gerarPDF(usuario.contrato.texto);
@@ -495,10 +488,8 @@ app.post('/webhook', async (req, res) => {
           const wordBuffer = await gerarWord(usuario.contrato.texto);
           await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
         }
-
         await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nDeseja alguma *alteração*? Me diga o que mudar que refaço na hora! 😊\n\nOu digite *NOVO* para gerar outro contrato.`);
         usuario.etapa = 'revisao';
-
         if (usuario.plano === 'avulso') {
           usuario.creditos = 0;
           usuario.plano = null;
@@ -509,7 +500,6 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Menu principal
     if (usuario.etapa === 'menu') {
       if (TIPOS_CONTRATO[msg]) {
         const tipo = TIPOS_CONTRATO[msg];
@@ -522,12 +512,10 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Coletando dados
     if (usuario.etapa === 'coletando') {
       const { tipo, dados, perguntaAtual } = usuario.contrato;
       dados.push(msg);
       const proxima = perguntaAtual + 1;
-
       if (proxima < PERGUNTAS[tipo].length) {
         usuario.contrato.perguntaAtual = proxima;
         await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][proxima]}`);
@@ -542,7 +530,6 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Revisão
     if (usuario.etapa === 'revisao') {
       if (msgUpper === 'NOVO') {
         usuario.etapa = 'avaliacao';
@@ -553,10 +540,8 @@ app.post('/webhook', async (req, res) => {
 
       if (msg.length < 5) return res.sendStatus(200);
 
-      // Proteção contra uso indevido
       const palavrasNovoContrato = ['quero um contrato', 'novo contrato', 'fazer contrato', 'preciso de um contrato', 'gerar contrato'];
       const parecePedidoNovo = palavrasNovoContrato.some(p => msg.toLowerCase().includes(p));
-
       if (parecePedidoNovo) {
         await enviarMensagem(phone, `Para gerar um *novo contrato* diferente deste, digite *NOVO*.\n\nSe quiser fazer uma alteração no contrato atual, me diga exatamente o que mudar! 😊`);
         return res.sendStatus(200);
@@ -573,7 +558,6 @@ app.post('/webhook', async (req, res) => {
           { role: 'user', content: `Faça as seguintes modificações: ${msg}\n\nRetorne o contrato completo com as modificações, usando as mesmas marcações [TITULO], [CLAUSULA] e [NEGRITO].` }
         ]
       });
-
       usuario.contrato.texto = atualizado.content[0].text;
       usuario.etapa = 'formato';
       await enviarMensagem(phone, `✅ Modificações aplicadas!\n\n${pedirFormato()}`);
@@ -586,28 +570,32 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Webhook Kiwify
 app.post('/kiwify', (req, res) => {
   try {
     const body = req.body;
-    console.log('Kiwify webhook:', JSON.stringify(body).substring(0, 500));
+    console.log('Kiwify webhook recebido');
+    console.log('Headers:', JSON.stringify(req.headers).substring(0, 300));
+    console.log('Body:', JSON.stringify(body).substring(0, 500));
 
-   const token = req.query.token || body.token || req.headers['x-kiwify-token'] || '';
-console.log('Token recebido:', token);
-console.log('Headers:', JSON.stringify(req.headers));
-const tokensValidos = (process.env.KIWIFY_TOKEN || '').split(',');
-if (token && !tokensValidos.includes(token)) {
-  console.log('Token inválido:', token);
-  return res.status(401).json({ error: 'Token inválido' });
-}
+    const token = req.query.token || body.token || req.headers['x-kiwify-token'] || '';
+    console.log('Token recebido:', token);
+
+    const tokensValidos = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
+    if (token && tokensValidos.length > 0 && tokensValidos[0] !== '' && !tokensValidos.includes(token)) {
+      console.log('Token inválido:', token);
+      return res.status(401).json({ error: 'Token inválido' });
+    }
 
     const phone = body.Customer?.mobile?.replace(/\D/g, '');
-    if (!phone) return res.sendStatus(200);
+    if (!phone) {
+      console.log('Telefone não encontrado');
+      return res.sendStatus(200);
+    }
 
     const usuario = getUsuario(phone);
     const status = body.order_status || body.subscription_status;
+    console.log('Status:', status, '| Phone:', phone);
 
-    // Cancelamento
     if (status === 'canceled' || status === 'cancelled') {
       usuario.plano = null;
       usuario.creditos = 0;
@@ -619,20 +607,20 @@ if (token && !tokensValidos.includes(token)) {
     if (status !== 'paid') return res.sendStatus(200);
 
     const preco = body.Product?.price || 0;
+    console.log('Preço:', preco);
 
     if (preco <= 1999) {
       usuario.plano = 'avulso';
       usuario.creditos = 1;
       usuario.dataExpiracao = null;
     } else {
-      // Renova os 30 dias a cada pagamento
       usuario.plano = 'ilimitado';
       usuario.creditos = 999;
       usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
     }
 
     usuario.etapa = 'menu';
-    console.log('Acesso liberado/renovado:', phone, '| Plano:', usuario.plano);
+    console.log('Acesso liberado:', phone, '| Plano:', usuario.plano);
     enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(true)}`);
     res.sendStatus(200);
   } catch (error) {
