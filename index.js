@@ -592,12 +592,14 @@ app.post('/kiwify', (req, res) => {
     const body = req.body;
     console.log('Kiwify webhook:', JSON.stringify(body).substring(0, 500));
 
-    const token = req.query.token || body.token;
-    const tokensValidos = (process.env.KIWIFY_TOKEN || '').split(',');
-    if (!tokensValidos.includes(token)) {
-      console.log('Token inválido:', token);
-      return res.status(401).json({ error: 'Token inválido' });
-    }
+   const token = req.query.token || body.token || req.headers['x-kiwify-token'] || '';
+console.log('Token recebido:', token);
+console.log('Headers:', JSON.stringify(req.headers));
+const tokensValidos = (process.env.KIWIFY_TOKEN || '').split(',');
+if (token && !tokensValidos.includes(token)) {
+  console.log('Token inválido:', token);
+  return res.status(401).json({ error: 'Token inválido' });
+}
 
     const phone = body.Customer?.mobile?.replace(/\D/g, '');
     if (!phone) return res.sendStatus(200);
