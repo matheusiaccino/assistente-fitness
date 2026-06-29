@@ -21,12 +21,13 @@ async function inicializarBanco() {
         plano VARCHAR(20),
         creditos INTEGER DEFAULT 0,
         data_expiracao BIGINT,
-        etapa VARCHAR(20) DEFAULT 'menu',
+        etapa VARCHAR(30) DEFAULT 'menu',
         contrato_tipo VARCHAR(50),
         contrato_dados TEXT,
         contrato_pergunta INTEGER DEFAULT 0,
         contrato_texto TEXT,
         ultima_nota INTEGER,
+        ultima_atividade BIGINT,
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -49,7 +50,7 @@ async function getUsuario(phone) {
   try {
     const result = await pool.query('SELECT * FROM usuarios WHERE phone = $1', [phone]);
     if (result.rows.length === 0) {
-      return { phone, plano: null, creditos: 0, etapa: 'menu', contrato: {}, dataExpiracao: null };
+      return { phone, plano: null, creditos: 0, etapa: 'menu', contrato: {}, dataExpiracao: null, ultimaAtividade: null };
     }
     const row = result.rows[0];
     return {
@@ -59,6 +60,7 @@ async function getUsuario(phone) {
       etapa: row.etapa,
       dataExpiracao: row.data_expiracao ? parseInt(row.data_expiracao) : null,
       ultimaNota: row.ultima_nota,
+      ultimaAtividade: row.ultima_atividade ? parseInt(row.ultima_atividade) : null,
       contrato: {
         tipo: row.contrato_tipo,
         dados: row.contrato_dados ? JSON.parse(row.contrato_dados) : [],
@@ -75,12 +77,12 @@ async function getUsuario(phone) {
 async function salvarUsuario(usuario) {
   try {
     await pool.query(`
-      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_texto, ultima_nota, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_texto, ultima_nota, ultima_atividade, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       ON CONFLICT (phone) DO UPDATE SET
         plano = $2, creditos = $3, data_expiracao = $4, etapa = $5,
         contrato_tipo = $6, contrato_dados = $7, contrato_pergunta = $8,
-        contrato_texto = $9, ultima_nota = $10, updated_at = NOW()
+        contrato_texto = $9, ultima_nota = $10, ultima_atividade = $11, updated_at = NOW()
     `, [
       usuario.phone,
       usuario.plano,
@@ -91,7 +93,8 @@ async function salvarUsuario(usuario) {
       usuario.contrato?.dados ? JSON.stringify(usuario.contrato.dados) : null,
       usuario.contrato?.perguntaAtual || 0,
       usuario.contrato?.texto || null,
-      usuario.ultimaNota || null
+      usuario.ultimaNota || null,
+      Date.now()
     ]);
   } catch (error) {
     console.error('Erro ao salvar usuario:', error);
@@ -115,6 +118,16 @@ function planoExpirado(usuario) {
   return false;
 }
 
+function dataAtual() {
+  const hoje = new Date();
+  return hoje.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+function dataExpiracaoFormatada(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 const TIPOS_CONTRATO = {
   '1': 'Prestação de Serviços',
   '2': 'Aluguel de Imóvel',
@@ -126,107 +139,150 @@ const TIPOS_CONTRATO = {
 
 const PERGUNTAS = {
   'Prestação de Serviços': [
-    'Qual é o seu nome completo e CPF ou CNPJ?',
-    'Qual é o nome completo e CPF ou CNPJ do cliente?',
-    'Qual serviço será prestado? Descreva com detalhes.',
-    'Qual o valor combinado pelo serviço?',
-    'Como será o pagamento? (à vista, parcelado ou mensal)',
-    'Qual a data de início do serviço?',
-    'Qual a data de término? (ou informe "indeterminado")',
-    'O serviço será presencial ou remoto?',
-    'Haverá multa por cancelamento? Se sim, qual o valor?'
+    'Qual é o seu nome completo, CPF e profissão?\n_(Ex: João Silva, CPF 123.456.789-00, Designer Gráfico)_',
+    'Qual é o nome completo e CPF do cliente?\n_(Ex: Maria Souza, CPF 987.654.321-00)_',
+    'Qual serviço será prestado? Descreva com detalhes o que será feito.\n_(Ex: Criação de logotipo e identidade visual completa)_',
+    'Qual o valor total cobrado pelo serviço?\n_(Ex: R$ 1.500,00)_',
+    'Como será o pagamento?\n_(Ex: 50% na assinatura e 50% na entrega / à vista / 3x de R$ 500)_',
+    'Qual a data de início do serviço?\n_(Ex: 01/07/2026)_',
+    'Qual a data de término ou prazo de entrega?\n_(Ex: 30/07/2026 ou "indeterminado")_',
+    'O serviço será presencial, remoto ou híbrido?\n_(Ex: remoto / presencial em São Paulo/SP)_',
+    'Haverá multa por cancelamento ou descumprimento?\n_(Ex: multa de 20% do valor total / não haverá multa)_'
   ],
   'Aluguel de Imóvel': [
-    'Qual o nome completo e CPF do proprietário?',
-    'Qual o nome completo e CPF do inquilino?',
-    'Qual o endereço completo do imóvel?',
-    'Qual o valor do aluguel mensal?',
-    'Qual o dia de vencimento do aluguel?',
-    'Qual a data de início do contrato? (ex: 01/07/2026)',
-    'Qual a data de término do contrato? (ex: 30/06/2028)',
-    'Haverá depósito caução? Se sim, qual o valor?',
-    'Permite animais de estimação? Permite reformas?',
-    'Haverá fiador? Se sim, qual o nome e CPF?',
-    'Qual o método de reajuste?\n\n1️⃣ IGPM/FGV\n2️⃣ Salário Mínimo\n3️⃣ Outro (descreva)'
+    'Nome completo, CPF e estado civil do proprietário (locador)?\n_(Ex: João Silva, CPF 123.456.789-00, casado)_',
+    'Nome completo, CPF e estado civil do inquilino (locatário)?\n_(Ex: Maria Souza, CPF 987.654.321-00, solteira)_',
+    'Endereço completo do imóvel alugado?\n_(Ex: Rua das Flores, 100, Apto 201, Bairro Centro, Ji-Paraná/RO, CEP 76900-000)_',
+    'Qual o valor do aluguel mensal?\n_(Ex: R$ 1.200,00)_',
+    'Qual o dia de vencimento do aluguel?\n_(Ex: todo dia 5 de cada mês)_',
+    'Data de início do contrato?\n_(Ex: 01/07/2026)_',
+    'Data de término do contrato?\n_(Ex: 30/06/2028)_',
+    'Haverá depósito caução?\n_(Ex: R$ 2.400,00 equivalente a 2 meses / não haverá)_',
+    'Permite animais de estimação? Permite reformas?\n_(Ex: não permite animais / permite pequenas reformas com autorização)_',
+    'Haverá fiador?\n_(Ex: sim — Pedro Oliveira, CPF 111.222.333-44 / não haverá fiador)_',
+    'Qual o índice de reajuste anual do aluguel?\n_(1 = IGPM/FGV / 2 = Salário Mínimo / 3 = IPCA / 4 = Outro — descreva)_'
   ],
   'Compra e Venda': [
-    'Qual o nome completo e CPF do vendedor?',
-    'Qual o nome completo e CPF do comprador?',
-    'O que está sendo vendido? (imóvel, veículo, outro)',
-    'Descreva detalhadamente o bem sendo vendido.',
-    'Qual o valor total da venda?',
-    'Como será o pagamento? (à vista, parcelado, financiado)',
-    'Qual a data de entrega ou transferência do bem?',
-    'O bem possui algum defeito conhecido?',
-    'Haverá multa em caso de desistência?'
+    'Nome completo, CPF e estado civil do vendedor?\n_(Ex: João Silva, CPF 123.456.789-00, casado)_',
+    'Nome completo, CPF e estado civil do comprador?\n_(Ex: Maria Souza, CPF 987.654.321-00, solteira)_',
+    'O que está sendo vendido?\n_(Ex: imóvel / veículo / equipamento / outro)_',
+    'Descrição detalhada do bem:\n_Para imóvel: endereço completo, matrícula, metragem_\n_Para veículo: marca, modelo, ano, cor, placa, chassi, RENAVAM_\n_Para outros: descreva com detalhes_',
+    'Qual o valor total da venda?\n_(Ex: R$ 250.000,00)_',
+    'Como será o pagamento?\n_(Ex: à vista no ato / 50% de entrada e saldo em 12x / financiamento bancário)_',
+    'Qual a data de entrega ou transferência do bem?\n_(Ex: 15/07/2026 ou "na assinatura do contrato")_',
+    'O bem possui algum débito, ônus ou defeito conhecido?\n_(Ex: sem débitos / IPTU em aberto de R$ 500 / pequeno amassado na porta)_',
+    'Haverá multa em caso de desistência?\n_(Ex: 10% do valor total / não haverá multa)_'
   ],
   'Contrato de Trabalho': [
-    'Qual o nome e CNPJ da empresa contratante?',
-    'Qual o nome completo e CPF do funcionário?',
-    'Qual a função ou cargo?',
-    'Qual o salário combinado?',
-    'Qual a carga horária semanal?',
-    'Qual a data de início?',
-    'É CLT, PJ ou contrato de experiência?',
-    'Quais benefícios? (VT, VR, plano de saúde, etc)',
-    'Haverá período de experiência? Qual a duração?'
+    'Nome completo e CNPJ da empresa contratante?\n_(Ex: Empresa ABC Ltda, CNPJ 12.345.678/0001-99)_',
+    'Nome completo, CPF e função do funcionário?\n_(Ex: Ana Lima, CPF 111.222.333-44, Assistente Administrativo)_',
+    'Qual o salário mensal combinado?\n_(Ex: R$ 2.000,00)_',
+    'Qual a carga horária semanal?\n_(Ex: 44 horas semanais, segunda a sexta das 8h às 18h)_',
+    'Qual a data de início?\n_(Ex: 01/07/2026)_',
+    'Qual o tipo de contratação?\n_(1 = CLT / 2 = PJ / 3 = Contrato de Experiência)_',
+    'Quais benefícios serão oferecidos?\n_(Ex: VT, VR de R$ 25/dia, plano de saúde / apenas salário)_',
+    'Haverá período de experiência?\n_(Ex: 45 dias prorrogável por mais 45 / não haverá)_',
+    'Endereço do local de trabalho?\n_(Ex: Rua X, 100, Centro, São Paulo/SP / trabalho remoto)_'
   ],
   'Parceria / Sociedade': [
-    'Quais os nomes e CPF ou CNPJ de todos os sócios?',
-    'Qual o objetivo do negócio ou parceria?',
-    'Qual a porcentagem de participação de cada sócio?',
-    'Quanto cada sócio irá investir inicialmente?',
-    'Como será feita a divisão de lucros?',
-    'Quem ficará responsável pelas decisões do dia a dia?',
-    'O que acontece se um sócio quiser sair?',
-    'O contrato tem prazo definido ou é indeterminado?'
+    'Nome completo, CPF e profissão de todos os sócios?\n_(Ex: João Silva, CPF 123.456.789-00, empresário / Maria Souza, CPF 987.654.321-00, médica)_',
+    'Qual o objetivo do negócio ou parceria? Descreva com detalhes.\n_(Ex: abertura de clínica odontológica especializada em ortodontia)_',
+    'Qual a porcentagem de participação de cada sócio?\n_(Ex: João 60% / Maria 40%)_',
+    'Quanto cada sócio irá investir inicialmente?\n_(Ex: João R$ 30.000 / Maria R$ 20.000)_',
+    'Como será feita a divisão dos lucros?\n_(Ex: proporcional à participação / 50% para cada independente da cota)_',
+    'Quem ficará responsável pelas decisões do dia a dia?\n_(Ex: João como sócio administrador / decisões conjuntas)_',
+    'O que acontece se um sócio quiser sair?\n_(Ex: deve oferecer a cota ao outro sócio primeiro / pode vender livremente)_',
+    'O contrato tem prazo definido?\n_(Ex: indeterminado / válido por 2 anos com renovação automática)_'
   ],
   'Outro': [
-    'Descreva com detalhes o que você precisa no contrato.',
-    'Quais são as partes envolvidas? (nomes e CPFs)',
-    'Quais são as obrigações de cada parte?',
-    'Qual o valor envolvido, se houver?',
-    'Qual o prazo do contrato?',
-    'Há alguma cláusula específica que deseja incluir?'
+    'Descreva com detalhes o que você precisa no contrato.\n_(Seja o mais específico possível sobre o objetivo)_',
+    'Quais são as partes envolvidas?\n_(Nome completo, CPF e papel de cada pessoa no contrato)_',
+    'Quais são as obrigações da primeira parte?\n_(O que ela deve fazer, entregar ou pagar)_',
+    'Quais são as obrigações da segunda parte?\n_(O que ela deve fazer, entregar ou pagar)_',
+    'Qual o valor financeiro envolvido, se houver?\n_(Ex: R$ 5.000,00 / não há valor financeiro)_',
+    'Qual o prazo do contrato?\n_(Ex: 12 meses a partir da assinatura / indeterminado)_',
+    'Há alguma cláusula específica que deseja incluir?\n_(Ex: cláusula de confidencialidade / exclusividade / não há)_'
   ]
 };
 
-async function gerarContrato(tipo, dados) {
-  const perguntasUsadas = PERGUNTAS[tipo];
+const PERGUNTAS_MINIMAS = {
+  'Prestação de Serviços': 10,
+  'Aluguel de Imóvel': 15,
+  'Compra e Venda': 10,
+  'Contrato de Trabalho': 10,
+  'Parceria / Sociedade': 10,
+  'Outro': 5
+};
+
+async function validarResposta(pergunta, resposta) {
+  if (resposta.trim().length < 3) return false;
+  const respostasVazias = ['não sei', 'nao sei', 'talvez', 'depende', '?', '-', '.', 'ok', 'sim', 'nao', 'não'];
+  if (respostasVazias.includes(resposta.toLowerCase().trim())) return false;
+  return true;
+}
+
+async function gerarContrato(tipo, dados, perguntas) {
   let instrucaoEspecial = '';
+
   if (tipo === 'Aluguel de Imóvel') {
     instrucaoEspecial = `
 INSTRUÇÕES ESPECIAIS PARA ALUGUEL:
 - O inquilino É RESPONSÁVEL por água, luz, condomínio e IPTU. Inclua isso nas cláusulas.
 - As datas de início e término já foram fornecidas, NÃO deixe espaços em branco.
-- Para o reajuste, use exatamente o método informado. Se for salário mínimo, calcule quantos salários mínimos equivale o aluguel (salário mínimo atual R$ 1.518,00) e redija a cláusula baseada nisso.`;
+- Para reajuste IGPM/FGV ou IPCA, mencione o índice pelo nome.
+- Para salário mínimo, calcule quantos salários mínimos equivale o aluguel (SM atual R$ 1.518,00).`;
   }
 
-  const prompt = `Você é um especialista em contratos jurídicos brasileiros.
-Gere um contrato completo e profissional de ${tipo} com base nas seguintes informações:
+  const dataHoje = dataAtual();
 
-${dados.map((d, i) => `${perguntasUsadas[i]}\nResposta: ${d}`).join('\n\n')}
+  const prompt = `Você é um especialista em contratos jurídicos brasileiros.
+Gere um contrato completo e profissional de ${tipo} com base nas seguintes informações coletadas:
+
+${dados.map((d, i) => `PERGUNTA: ${perguntas[i]}\nRESPOSTA: ${d}`).join('\n\n')}
+
+DATA DE HOJE: ${dataHoje}
 
 ${instrucaoEspecial}
 
-IMPORTANTE - Formate usando estas marcações:
+REGRAS IMPORTANTES:
+1. Use a data de hoje (${dataHoje}) como data de geração do contrato
+2. Onde faltar informação essencial que o cliente não forneceu, insira [PREENCHER: descrição do dado] em negrito — NUNCA invente dados
+3. Os dados das partes (nome, CPF, endereço) devem estar EXATAMENTE como informados
+4. Verifique inconsistências antes de gerar (ex: data de término antes do início)
+5. Inclua todas as cláusulas necessárias conforme a legislação brasileira
+
+FORMATO - use estas marcações:
 - Título principal: [TITULO]texto[/TITULO]
 - Títulos de cláusulas: [CLAUSULA]texto[/CLAUSULA]
 - Negrito importante: [NEGRITO]texto[/NEGRITO]
 - Parágrafos normais: texto normal
 
-O contrato deve:
-- Estar em conformidade com a legislação brasileira vigente
-- Ter linguagem formal e profissional
-- Incluir todas as cláusulas necessárias
-- NÃO deixar espaços em branco onde já temos informações
-- Incluir espaço para assinaturas das partes e duas testemunhas
+O contrato deve incluir espaço para assinaturas das partes e duas testemunhas.
 
 Gere o contrato completo agora.`;
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4000,
+    messages: [{ role: 'user', content: prompt }]
+  });
+  return response.content[0].text;
+}
+
+async function verificarContrato(textoContrato) {
+  const prompt = `Analise este contrato jurídico e identifique:
+1. Dados essenciais que estão faltando ou com [PREENCHER]
+2. Inconsistências (datas erradas, valores conflitantes, etc)
+3. Cláusulas importantes ausentes
+
+Contrato:
+${textoContrato}
+
+Responda em formato simples, em português, listando apenas os problemas encontrados. Se o contrato estiver completo e consistente, responda apenas: "OK"`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 500,
     messages: [{ role: 'user', content: prompt }]
   });
   return response.content[0].text;
@@ -285,7 +341,7 @@ function gerarPDF(textoContrato) {
     }
 
     doc.moveDown(2);
-    doc.fontSize(10).font('Helvetica').text('Local e Data: _________________________, _____ de _________________ de _______', 70, doc.y, { width: larguraPagina });
+    doc.fontSize(10).font('Helvetica').text(`Local e Data: _________________________, ${dataAtual()}`, 70, doc.y, { width: larguraPagina });
     doc.moveDown(2.5);
 
     const yA1 = doc.y;
@@ -369,7 +425,7 @@ async function gerarWord(textoContrato) {
   }
 
   paragrafos.push(new Paragraph({ text: '', spacing: { before: 400 } }));
-  paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Local e Data: _________________________, _____ de _________________ de _______', size: 20 })] }));
+  paragrafos.push(new Paragraph({ children: [new TextRun({ text: `Local e Data: _________________________, ${dataAtual()}`, size: 20 })] }));
   paragrafos.push(new Paragraph({ text: '', spacing: { before: 400 } }));
   paragrafos.push(new Paragraph({ children: [new TextRun({ text: '________________________________________', size: 20 })] }));
   paragrafos.push(new Paragraph({ children: [new TextRun({ text: 'Contratante / Locador / Vendedor', size: 20 })] }));
@@ -412,11 +468,19 @@ async function enviarArquivo(phone, buffer, nomeArquivo, mimetype, caption) {
   }
 }
 
-function menuPrincipal(temAcesso) {
-  const dicas = `\n\n💡 *Comandos disponíveis a qualquer momento:*\n• Digite *SUPORTE* — para falar com nossa equipe\n• Digite *CANCELAR PLANO* — para cancelar sua assinatura\n• Digite *MENU* — para voltar ao menu principal`;
+function menuPrincipal(usuario) {
+  const temAcesso = usuario && (usuario.plano || usuario.creditos > 0);
+  const dicas = `\n\n💡 *Comandos disponíveis a qualquer momento:*\n• *SUPORTE* — falar com nossa equipe\n• *CANCELAR PLANO* — cancelar sua assinatura\n• *MENU* — voltar ao menu principal\n• *PDF* ou *WORD* — receber o contrato no formato desejado`;
+
+  let infoplano = '';
+  if (usuario?.plano === 'ilimitado' && usuario?.dataExpiracao) {
+    infoplano = `\n\n♾️ *Plano Ilimitado* — válido até ${dataExpiracaoFormatada(usuario.dataExpiracao)}`;
+  } else if (usuario?.plano === 'avulso' && usuario?.creditos > 0) {
+    infoplano = `\n\n⚠️ Você tem *1 contrato disponível*. Após gerar não será possível gerar outro sem adquirir um novo acesso.`;
+  }
 
   if (temAcesso) {
-    return `Qual tipo de contrato você precisa? ⚖️
+    return `Qual tipo de contrato você precisa? ⚖️${infoplano}
 
 1️⃣ Prestação de Serviços
 2️⃣ Aluguel de Imóvel
@@ -450,7 +514,9 @@ function pedirFormato() {
   return `Em qual formato você prefere receber o contrato?
 
 1️⃣ PDF (recomendado para assinar)
-2️⃣ Word (.docx) (para editar antes de assinar)`;
+2️⃣ Word (.docx) (para editar antes de assinar)
+
+💡 Você também pode digitar *PDF* ou *WORD* a qualquer momento para receber o contrato no formato desejado.`;
 }
 
 function pedirAvaliacao() {
@@ -465,6 +531,18 @@ Antes de ir, que tal avaliar nosso serviço?
 ⭐⭐⭐⭐⭐ 5 - Excelente
 
 Responda com o número de 1 a 5.`;
+}
+
+async function enviarContrato(phone, usuario, formato) {
+  const tipo = usuario.contrato.tipo;
+  if (formato === 'pdf') {
+    const pdfBuffer = await gerarPDF(usuario.contrato.texto);
+    await enviarArquivo(phone, pdfBuffer, `Contrato_${tipo.replace(/ /g, '_')}.pdf`, 'application/pdf', '📄 Seu contrato em PDF está pronto!');
+  } else {
+    const wordBuffer = await gerarWord(usuario.contrato.texto);
+    await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
+  }
+  await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato`);
 }
 
 app.post('/webhook', async (req, res) => {
@@ -496,49 +574,103 @@ app.post('/webhook', async (req, res) => {
 
     if (usuario.etapa === 'gerando') return res.sendStatus(200);
 
+    // Verifica timeout de 24h para conversa em andamento
+    if (usuario.etapa === 'coletando' && usuario.ultimaAtividade) {
+      const horasInativo = (Date.now() - usuario.ultimaAtividade) / (1000 * 60 * 60);
+      if (horasInativo > 24) {
+        await enviarMensagem(phone, `Olá! 👋 Você deixou um contrato de *${usuario.contrato.tipo}* em andamento.\n\nDeseja continuar de onde parou ou começar um novo?\n\n1️⃣ Continuar de onde parei\n2️⃣ Começar um novo contrato`);
+        usuario.etapa = 'retomada';
+        await salvarUsuario(usuario);
+        return res.sendStatus(200);
+      }
+    }
+
+    // Verifica expiração
     if (planoExpirado(usuario)) {
       usuario.plano = null;
       usuario.creditos = 0;
       usuario.dataExpiracao = null;
       await salvarUsuario(usuario);
-      await enviarMensagem(phone, `⚠️ Seu *Plano Ilimitado* expirou!\n\nPara continuar gerando contratos escolha um novo plano:\n\n${menuPrincipal(false)}`);
+      await enviarMensagem(phone, `⚠️ Seu *Plano Ilimitado* expirou!\n\nPara continuar gerando contratos escolha um novo plano:\n\n${menuPrincipal(null)}`);
       return res.sendStatus(200);
     }
 
+    // Retomada de conversa
+    if (usuario.etapa === 'retomada') {
+      if (msg === '1') {
+        usuario.etapa = 'coletando';
+        await salvarUsuario(usuario);
+        const perguntas = PERGUNTAS[usuario.contrato.tipo];
+        const perguntaAtual = usuario.contrato.perguntaAtual;
+        await enviarMensagem(phone, `Continuando seu contrato de *${usuario.contrato.tipo}*! 📋\n\n*Pergunta ${perguntaAtual + 1} de ${perguntas.length}:*\n${perguntas[perguntaAtual]}`);
+      } else {
+        usuario.etapa = 'menu';
+        usuario.contrato = {};
+        await salvarUsuario(usuario);
+        await enviarMensagem(phone, menuPrincipal(usuario));
+      }
+      return res.sendStatus(200);
+    }
+
+    // PDF ou WORD a qualquer momento
+    if (msgUpper === 'PDF' && usuario.contrato?.texto) {
+      usuario.etapa = 'gerando';
+      await salvarUsuario(usuario);
+      await enviarMensagem(phone, `Gerando seu contrato em PDF... ⏳`);
+      await enviarContrato(phone, usuario, 'pdf');
+      usuario.etapa = 'revisao';
+      await salvarUsuario(usuario);
+      return res.sendStatus(200);
+    }
+
+    if (msgUpper === 'WORD' && usuario.contrato?.texto) {
+      usuario.etapa = 'gerando';
+      await salvarUsuario(usuario);
+      await enviarMensagem(phone, `Gerando seu contrato em Word... ⏳`);
+      await enviarContrato(phone, usuario, 'word');
+      usuario.etapa = 'revisao';
+      await salvarUsuario(usuario);
+      return res.sendStatus(200);
+    }
+
+    // MENU
     if (msgUpper === 'MENU') {
       usuario.etapa = 'menu';
       usuario.contrato = {};
       await salvarUsuario(usuario);
-      const temAcesso = usuario.plano || usuario.creditos > 0;
-      await enviarMensagem(phone, menuPrincipal(!!temAcesso));
+      await enviarMensagem(phone, menuPrincipal(usuario));
       return res.sendStatus(200);
     }
 
+    // SUPORTE
     if (msgUpper === 'SUPORTE') {
       await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.`);
       return res.sendStatus(200);
     }
 
+    // CANCELAR PLANO
     if (msgUpper === 'CANCELAR PLANO') {
       if (usuario.plano === 'ilimitado') {
-        await enviarMensagem(phone, `😢 Que pena que deseja cancelar seu plano!\n\nSua assinatura possui *renovação automática mensal*. Para cancelar e não ser cobrado no próximo mês, entre em contato com nosso suporte:\n\n📧 contratobotsuporte@gmail.com\n\nVocê continuará tendo acesso até o final do período já pago.`);
+        await enviarMensagem(phone, `😢 Que pena que deseja cancelar seu plano!\n\nSua assinatura possui *renovação automática mensal*. Para cancelar e não ser cobrado no próximo mês, entre em contato:\n\n📧 contratobotsuporte@gmail.com\n\nVocê continuará tendo acesso até o final do período já pago.`);
       } else {
-        await enviarMensagem(phone, `Você não possui uma assinatura ativa no momento. 😊\n\nSe precisar de ajuda digite *SUPORTE*.`);
+        await enviarMensagem(phone, `Você não possui uma assinatura ativa. 😊\n\nSe precisar de ajuda digite *SUPORTE*.`);
       }
       return res.sendStatus(200);
     }
 
+    // Sem acesso
     if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario'].includes(usuario.etapa)) {
       if (msg === '1') {
-        await enviarMensagem(phone, `Ótimo! Acesse o link abaixo para realizar o pagamento de *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente aqui no WhatsApp! ✅`);
+        await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
       } else if (msg === '2') {
-        await enviarMensagem(phone, `Ótimo! Acesse o link abaixo para assinar o Plano Ilimitado por *R$ 49,99/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+        await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 49,99/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
       } else {
-        await enviarMensagem(phone, menuPrincipal(false));
+        await enviarMensagem(phone, menuPrincipal(null));
       }
       return res.sendStatus(200);
     }
 
+    // Avaliação
     if (usuario.etapa === 'avaliacao') {
       const nota = parseInt(msg);
       if (nota >= 1 && nota <= 5) {
@@ -557,31 +689,29 @@ app.post('/webhook', async (req, res) => {
       const comentario = msgUpper === 'PULAR' ? '' : msg;
       await pool.query('INSERT INTO avaliacoes (phone, nota, comentario) VALUES ($1, $2, $3)', [phone, usuario.ultimaNota, comentario]);
       usuario.etapa = 'menu';
+      usuario.contrato = {};
       await salvarUsuario(usuario);
-      await enviarMensagem(phone, `Muito obrigado pelo feedback! 😊\n\nVolte sempre que precisar de um contrato. Até logo! 👋`);
+      await enviarMensagem(phone, `Muito obrigado pelo feedback! 😊\n\nVolte sempre que precisar. Até logo! 👋`);
       return res.sendStatus(200);
     }
 
+    // Escolha de formato
     if (usuario.etapa === 'formato') {
-      if (msg === '1' || msg === '2') {
-        const formato = msg === '1' ? 'pdf' : 'word';
+      if (msg === '1' || msgUpper === 'PDF') {
         usuario.etapa = 'gerando';
         await salvarUsuario(usuario);
-        await enviarMensagem(phone, `Gerando seu contrato em ${formato === 'pdf' ? 'PDF' : 'Word'}... ⏳`);
-        const tipo = usuario.contrato.tipo;
-        if (formato === 'pdf') {
-          const pdfBuffer = await gerarPDF(usuario.contrato.texto);
-          await enviarArquivo(phone, pdfBuffer, `Contrato_${tipo.replace(/ /g, '_')}.pdf`, 'application/pdf', '📄 Seu contrato em PDF está pronto!');
-        } else {
-          const wordBuffer = await gerarWord(usuario.contrato.texto);
-          await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
-        }
-        await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nDeseja alguma *alteração*? Me diga o que mudar que refaço na hora! 😊\n\nOu digite *NOVO* para gerar outro contrato.`);
+        await enviarMensagem(phone, `Gerando seu contrato em PDF... ⏳`);
+        await enviarContrato(phone, usuario, 'pdf');
         usuario.etapa = 'revisao';
-        if (usuario.plano === 'avulso') {
-          usuario.creditos = 0;
-          usuario.plano = null;
-        }
+        if (usuario.plano === 'avulso') { usuario.creditos = 0; usuario.plano = null; }
+        await salvarUsuario(usuario);
+      } else if (msg === '2' || msgUpper === 'WORD') {
+        usuario.etapa = 'gerando';
+        await salvarUsuario(usuario);
+        await enviarMensagem(phone, `Gerando seu contrato em Word... ⏳`);
+        await enviarContrato(phone, usuario, 'word');
+        usuario.etapa = 'revisao';
+        if (usuario.plano === 'avulso') { usuario.creditos = 0; usuario.plano = null; }
         await salvarUsuario(usuario);
       } else {
         await enviarMensagem(phone, pedirFormato());
@@ -589,40 +719,101 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // Menu principal
     if (usuario.etapa === 'menu') {
       if (TIPOS_CONTRATO[msg]) {
         const tipo = TIPOS_CONTRATO[msg];
         usuario.contrato = { tipo, dados: [], perguntaAtual: 0 };
         usuario.etapa = 'coletando';
         await salvarUsuario(usuario);
-        await enviarMensagem(phone, `Ótimo! Vou gerar seu contrato de *${tipo}*. 📋\n\nPreciso de algumas informações rápidas!\n\n*Pergunta 1 de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][0]}`);
+        await enviarMensagem(phone, `Ótimo! Vou gerar seu contrato de *${tipo}*. 📋\n\nVou fazer algumas perguntas. Responda com o máximo de detalhes possível para gerar um contrato completo!\n\n*Pergunta 1 de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][0]}`);
       } else {
-        await enviarMensagem(phone, menuPrincipal(true));
+        await enviarMensagem(phone, menuPrincipal(usuario));
       }
       return res.sendStatus(200);
     }
 
+    // Coletando dados
     if (usuario.etapa === 'coletando') {
       const { tipo, dados, perguntaAtual } = usuario.contrato;
+      const perguntas = PERGUNTAS[tipo];
+
+      // Valida resposta
+      const respostaValida = await validarResposta(perguntas[perguntaAtual], msg);
+      if (!respostaValida) {
+        await enviarMensagem(phone, `Por favor, responda com mais detalhes! 😊\n\n*Pergunta ${perguntaAtual + 1} de ${perguntas.length}:*\n${perguntas[perguntaAtual]}\n\nSe não quiser informar este dado, responda *"não informado"*.`);
+        return res.sendStatus(200);
+      }
+
       dados.push(msg);
       const proxima = perguntaAtual + 1;
-      if (proxima < PERGUNTAS[tipo].length) {
+
+      if (proxima < perguntas.length) {
         usuario.contrato.perguntaAtual = proxima;
         await salvarUsuario(usuario);
-        await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][proxima]}`);
+        await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${perguntas.length}:*\n${perguntas[proxima]}`);
       } else {
+        // Mostra resumo antes de gerar
+        const resumo = dados.map((d, i) => `• ${perguntas[i].split('\n')[0].replace(/[*_]/g, '')}\n  _${d}_`).join('\n\n');
+        usuario.contrato.dados = dados;
+        usuario.etapa = 'confirmando';
+        await salvarUsuario(usuario);
+        await enviarMensagem(phone, `Perfeito! Aqui está um resumo das informações:\n\n${resumo}\n\n✅ Digite *SIM* para gerar o contrato\n✏️ Digite o número da pergunta para corrigir (ex: *3* para corrigir a pergunta 3)`);
+      }
+      return res.sendStatus(200);
+    }
+
+    // Confirmação antes de gerar
+    if (usuario.etapa === 'confirmando') {
+      const { tipo, dados } = usuario.contrato;
+      const perguntas = PERGUNTAS[tipo];
+
+      if (msgUpper === 'SIM') {
         usuario.etapa = 'gerando';
         await salvarUsuario(usuario);
-        await enviarMensagem(phone, `Perfeito! Tenho todas as informações. ✅\n\nGerando seu contrato, aguarde um instante... ⏳`);
-        const textoContrato = await gerarContrato(tipo, dados);
+        await enviarMensagem(phone, `Gerando seu contrato... ⏳\n\nIsso pode levar alguns segundos!`);
+        const textoContrato = await gerarContrato(tipo, dados, perguntas);
+
+        // Verifica inconsistências
+        const verificacao = await verificarContrato(textoContrato);
         usuario.contrato.texto = textoContrato;
+
+        if (verificacao.trim() !== 'OK') {
+          await enviarMensagem(phone, `⚠️ *Atenção — encontrei alguns pontos no contrato:*\n\n${verificacao}\n\nO contrato foi gerado assim mesmo. Você pode pedir alterações depois de receber.`);
+        }
+
         usuario.etapa = 'formato';
         await salvarUsuario(usuario);
         await enviarMensagem(phone, pedirFormato());
+      } else {
+        // Tenta corrigir uma pergunta específica
+        const num = parseInt(msg);
+        if (num >= 1 && num <= perguntas.length) {
+          usuario.contrato.corrigindo = num - 1;
+          usuario.etapa = 'corrigindo';
+          await salvarUsuario(usuario);
+          await enviarMensagem(phone, `Tudo bem! Vamos corrigir a pergunta ${num}:\n\n${perguntas[num - 1]}\n\nQual é a resposta correta?`);
+        } else {
+          await enviarMensagem(phone, `Digite *SIM* para gerar o contrato ou o número da pergunta que deseja corrigir (1 a ${perguntas.length}).`);
+        }
       }
       return res.sendStatus(200);
     }
 
+    // Corrigindo uma resposta específica
+    if (usuario.etapa === 'corrigindo') {
+      const { tipo, dados, corrigindo } = usuario.contrato;
+      const perguntas = PERGUNTAS[tipo];
+      dados[corrigindo] = msg;
+      usuario.contrato.dados = dados;
+      usuario.etapa = 'confirmando';
+      await salvarUsuario(usuario);
+      const resumo = dados.map((d, i) => `• ${perguntas[i].split('\n')[0].replace(/[*_]/g, '')}\n  _${d}_`).join('\n\n');
+      await enviarMensagem(phone, `✅ Corrigido!\n\nResumo atualizado:\n\n${resumo}\n\nDigite *SIM* para gerar o contrato ou o número de outra pergunta para corrigir.`);
+      return res.sendStatus(200);
+    }
+
+    // Revisão
     if (usuario.etapa === 'revisao') {
       if (msgUpper === 'NOVO') {
         usuario.etapa = 'avaliacao';
@@ -637,13 +828,13 @@ app.post('/webhook', async (req, res) => {
       const palavrasNovoContrato = ['quero um contrato', 'novo contrato', 'fazer contrato', 'preciso de um contrato', 'gerar contrato'];
       const parecePedidoNovo = palavrasNovoContrato.some(p => msg.toLowerCase().includes(p));
       if (parecePedidoNovo) {
-        await enviarMensagem(phone, `Para gerar um *novo contrato* diferente deste, digite *NOVO*.\n\nSe quiser fazer uma alteração no contrato atual, me diga exatamente o que mudar! 😊`);
+        await enviarMensagem(phone, `Para gerar um *novo contrato*, digite *NOVO*.\n\nSe quiser alterar o contrato atual, me diga o que mudar! 😊`);
         return res.sendStatus(200);
       }
 
       usuario.etapa = 'gerando';
       await salvarUsuario(usuario);
-      await enviarMensagem(phone, `Entendido! Aplicando as modificações... ⏳`);
+      await enviarMensagem(phone, `Aplicando as modificações... ⏳`);
       const atualizado = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 4000,
@@ -669,17 +860,14 @@ app.post('/webhook', async (req, res) => {
 app.post('/kiwify', async (req, res) => {
   try {
     const body = req.body;
-    console.log('Kiwify webhook recebido');
-
     const token = req.query.token || body.token || req.headers['x-kiwify-token'] || '';
-    console.log('Token recebido:', token);
+    console.log('Kiwify webhook | Token:', token);
 
     const tokensAvulso = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
     const tokensIlimitado = (process.env.KIWIFY_TOKEN_ILIMITADO || '').split(',').map(t => t.trim());
     const todosTokens = [...tokensAvulso, ...tokensIlimitado];
 
     if (token && todosTokens.length > 0 && !todosTokens.includes(token)) {
-      console.log('Token inválido:', token);
       return res.status(401).json({ error: 'Token inválido' });
     }
 
@@ -688,14 +876,13 @@ app.post('/kiwify', async (req, res) => {
 
     const usuario = await getUsuario(phone);
     const status = body.order_status || body.subscription_status;
-    console.log('Status:', status, '| Phone:', phone);
 
     if (status === 'canceled' || status === 'cancelled') {
       usuario.plano = null;
       usuario.creditos = 0;
       usuario.dataExpiracao = null;
       await salvarUsuario(usuario);
-      enviarMensagem(phone, `😢 Sua assinatura foi cancelada.\n\nSeu acesso permanece ativo até o final do período pago.\n\nSe quiser voltar:\n\n${menuPrincipal(false)}`);
+      enviarMensagem(phone, `😢 Sua assinatura foi cancelada.\n\nSeu acesso permanece ativo até o final do período pago.\n\nSe quiser voltar:\n\n${menuPrincipal(null)}`);
       return res.sendStatus(200);
     }
 
@@ -705,18 +892,15 @@ app.post('/kiwify', async (req, res) => {
       usuario.plano = 'ilimitado';
       usuario.creditos = 999;
       usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
-      console.log('Plano ilimitado liberado!');
     } else {
       usuario.plano = 'avulso';
       usuario.creditos = 1;
       usuario.dataExpiracao = null;
-      console.log('Plano avulso liberado!');
     }
 
     usuario.etapa = 'menu';
     await salvarUsuario(usuario);
-    console.log('Acesso liberado:', phone, '| Plano:', usuario.plano);
-    enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(true)}`);
+    enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(usuario)}`);
     res.sendStatus(200);
   } catch (error) {
     console.error('Erro kiwify:', error);
@@ -728,9 +912,7 @@ app.get('/teste', async (req, res) => {
   const { phone, plano, senha } = req.query;
   if (senha !== 'matheus123') return res.status(401).json({ error: 'Senha inválida' });
   if (!phone) return res.status(400).json({ error: 'Phone obrigatório' });
-
   const usuario = await getUsuario(phone);
-
   if (plano === 'ilimitado') {
     usuario.plano = 'ilimitado';
     usuario.creditos = 999;
@@ -740,10 +922,9 @@ app.get('/teste', async (req, res) => {
     usuario.creditos = 1;
     usuario.dataExpiracao = null;
   }
-
   usuario.etapa = 'menu';
   await salvarUsuario(usuario);
-  enviarMensagem(phone, `🎉 *Acesso de teste liberado!*\n\n${menuPrincipal(true)}`);
+  enviarMensagem(phone, `🎉 *Acesso de teste liberado!*\n\n${menuPrincipal(usuario)}`);
   res.json({ success: true, phone, plano: usuario.plano });
 });
 
@@ -758,7 +939,6 @@ app.get('/avaliacoes', async (req, res) => {
 app.get('/', (req, res) => { res.json({ status: 'ContratoBot rodando!' }); });
 
 const PORT = process.env.PORT || 3000;
-
 inicializarBanco().then(() => {
   app.listen(PORT, () => { console.log('ContratoBot rodando na porta ' + PORT); });
 });
