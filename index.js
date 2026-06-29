@@ -606,9 +606,9 @@ app.post('/kiwify', (req, res) => {
 
     if (status !== 'paid') return res.sendStatus(200);
 
-    const preco = body.Product?.price || 0;
-    console.log('Preço:', preco);
-
+const preco = body.Product?.price || body.product?.price || body.Subscription?.plan?.price || body.subscription?.plan?.price || body.amount || body.total_price || 0;
+console.log('Preço:', preco);
+console.log('Produto completo:', JSON.stringify(body.Product || body.product || body.Subscription || body.subscription || {}));
     if (preco <= 1999) {
       usuario.plano = 'avulso';
       usuario.creditos = 1;
