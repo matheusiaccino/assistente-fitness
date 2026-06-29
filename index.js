@@ -4,18 +4,101 @@ app.use(express.json());
 const Anthropic = require('@anthropic-ai/sdk');
 const PDFDocument = require('pdfkit');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
+const { Pool } = require('pg');
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const usuarios = {};
-const ultimasMensagens = {};
-const avaliacoes = [];
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-function getUsuario(phone) {
-  if (!usuarios[phone]) {
-    usuarios[phone] = { etapa: 'menu', plano: null, creditos: 0, contrato: {}, dataExpiracao: null };
+async function inicializarBanco() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        phone VARCHAR(20) PRIMARY KEY,
+        plano VARCHAR(20),
+        creditos INTEGER DEFAULT 0,
+        data_expiracao BIGINT,
+        etapa VARCHAR(20) DEFAULT 'menu',
+        contrato_tipo VARCHAR(50),
+        contrato_dados TEXT,
+        contrato_pergunta INTEGER DEFAULT 0,
+        contrato_texto TEXT,
+        ultima_nota INTEGER,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS avaliacoes (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(20),
+        nota INTEGER,
+        comentario TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('Banco de dados inicializado!');
+  } catch (error) {
+    console.error('Erro ao inicializar banco:', error);
   }
-  return usuarios[phone];
 }
+
+async function getUsuario(phone) {
+  try {
+    const result = await pool.query('SELECT * FROM usuarios WHERE phone = $1', [phone]);
+    if (result.rows.length === 0) {
+      return { phone, plano: null, creditos: 0, etapa: 'menu', contrato: {}, dataExpiracao: null };
+    }
+    const row = result.rows[0];
+    return {
+      phone: row.phone,
+      plano: row.plano,
+      creditos: row.creditos,
+      etapa: row.etapa,
+      dataExpiracao: row.data_expiracao ? parseInt(row.data_expiracao) : null,
+      ultimaNota: row.ultima_nota,
+      contrato: {
+        tipo: row.contrato_tipo,
+        dados: row.contrato_dados ? JSON.parse(row.contrato_dados) : [],
+        perguntaAtual: row.contrato_pergunta || 0,
+        texto: row.contrato_texto
+      }
+    };
+  } catch (error) {
+    console.error('Erro ao buscar usuario:', error);
+    return { phone, plano: null, creditos: 0, etapa: 'menu', contrato: {}, dataExpiracao: null };
+  }
+}
+
+async function salvarUsuario(usuario) {
+  try {
+    await pool.query(`
+      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_texto, ultima_nota, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+      ON CONFLICT (phone) DO UPDATE SET
+        plano = $2, creditos = $3, data_expiracao = $4, etapa = $5,
+        contrato_tipo = $6, contrato_dados = $7, contrato_pergunta = $8,
+        contrato_texto = $9, ultima_nota = $10, updated_at = NOW()
+    `, [
+      usuario.phone,
+      usuario.plano,
+      usuario.creditos,
+      usuario.dataExpiracao,
+      usuario.etapa,
+      usuario.contrato?.tipo || null,
+      usuario.contrato?.dados ? JSON.stringify(usuario.contrato.dados) : null,
+      usuario.contrato?.perguntaAtual || 0,
+      usuario.contrato?.texto || null,
+      usuario.ultimaNota || null
+    ]);
+  } catch (error) {
+    console.error('Erro ao salvar usuario:', error);
+  }
+}
+
+const ultimasMensagens = {};
 
 function isDuplicata(phone, texto) {
   const agora = Date.now();
@@ -406,7 +489,7 @@ app.post('/webhook', async (req, res) => {
     if (!phone) return res.sendStatus(200);
     if (isDuplicata(phone, texto)) return res.sendStatus(200);
 
-    const usuario = getUsuario(phone);
+    const usuario = await getUsuario(phone);
     const msg = texto.trim();
     const msgUpper = msg.toUpperCase();
     console.log('Mensagem de', phone, ':', msg, '| Etapa:', usuario.etapa);
@@ -417,6 +500,7 @@ app.post('/webhook', async (req, res) => {
       usuario.plano = null;
       usuario.creditos = 0;
       usuario.dataExpiracao = null;
+      await salvarUsuario(usuario);
       await enviarMensagem(phone, `⚠️ Seu *Plano Ilimitado* expirou!\n\nPara continuar gerando contratos escolha um novo plano:\n\n${menuPrincipal(false)}`);
       return res.sendStatus(200);
     }
@@ -424,6 +508,7 @@ app.post('/webhook', async (req, res) => {
     if (msgUpper === 'MENU') {
       usuario.etapa = 'menu';
       usuario.contrato = {};
+      await salvarUsuario(usuario);
       const temAcesso = usuario.plano || usuario.creditos > 0;
       await enviarMensagem(phone, menuPrincipal(!!temAcesso));
       return res.sendStatus(200);
@@ -459,6 +544,7 @@ app.post('/webhook', async (req, res) => {
       if (nota >= 1 && nota <= 5) {
         usuario.ultimaNota = nota;
         usuario.etapa = 'comentario';
+        await salvarUsuario(usuario);
         const estrelas = '⭐'.repeat(nota);
         await enviarMensagem(phone, `${estrelas} Obrigado pela avaliação!\n\nTem algum elogio, crítica ou sugestão? (opcional)\n\nOu digite *PULAR* para encerrar.`);
       } else {
@@ -469,8 +555,9 @@ app.post('/webhook', async (req, res) => {
 
     if (usuario.etapa === 'comentario') {
       const comentario = msgUpper === 'PULAR' ? '' : msg;
-      avaliacoes.push({ phone, nota: usuario.ultimaNota, comentario, data: new Date().toISOString() });
+      await pool.query('INSERT INTO avaliacoes (phone, nota, comentario) VALUES ($1, $2, $3)', [phone, usuario.ultimaNota, comentario]);
       usuario.etapa = 'menu';
+      await salvarUsuario(usuario);
       await enviarMensagem(phone, `Muito obrigado pelo feedback! 😊\n\nVolte sempre que precisar de um contrato. Até logo! 👋`);
       return res.sendStatus(200);
     }
@@ -479,6 +566,7 @@ app.post('/webhook', async (req, res) => {
       if (msg === '1' || msg === '2') {
         const formato = msg === '1' ? 'pdf' : 'word';
         usuario.etapa = 'gerando';
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, `Gerando seu contrato em ${formato === 'pdf' ? 'PDF' : 'Word'}... ⏳`);
         const tipo = usuario.contrato.tipo;
         if (formato === 'pdf') {
@@ -494,6 +582,7 @@ app.post('/webhook', async (req, res) => {
           usuario.creditos = 0;
           usuario.plano = null;
         }
+        await salvarUsuario(usuario);
       } else {
         await enviarMensagem(phone, pedirFormato());
       }
@@ -505,6 +594,7 @@ app.post('/webhook', async (req, res) => {
         const tipo = TIPOS_CONTRATO[msg];
         usuario.contrato = { tipo, dados: [], perguntaAtual: 0 };
         usuario.etapa = 'coletando';
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, `Ótimo! Vou gerar seu contrato de *${tipo}*. 📋\n\nPreciso de algumas informações rápidas!\n\n*Pergunta 1 de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][0]}`);
       } else {
         await enviarMensagem(phone, menuPrincipal(true));
@@ -518,13 +608,16 @@ app.post('/webhook', async (req, res) => {
       const proxima = perguntaAtual + 1;
       if (proxima < PERGUNTAS[tipo].length) {
         usuario.contrato.perguntaAtual = proxima;
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${PERGUNTAS[tipo].length}:*\n${PERGUNTAS[tipo][proxima]}`);
       } else {
         usuario.etapa = 'gerando';
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, `Perfeito! Tenho todas as informações. ✅\n\nGerando seu contrato, aguarde um instante... ⏳`);
         const textoContrato = await gerarContrato(tipo, dados);
         usuario.contrato.texto = textoContrato;
         usuario.etapa = 'formato';
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, pedirFormato());
       }
       return res.sendStatus(200);
@@ -534,6 +627,7 @@ app.post('/webhook', async (req, res) => {
       if (msgUpper === 'NOVO') {
         usuario.etapa = 'avaliacao';
         usuario.contrato = {};
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, pedirAvaliacao());
         return res.sendStatus(200);
       }
@@ -548,6 +642,7 @@ app.post('/webhook', async (req, res) => {
       }
 
       usuario.etapa = 'gerando';
+      await salvarUsuario(usuario);
       await enviarMensagem(phone, `Entendido! Aplicando as modificações... ⏳`);
       const atualizado = await client.messages.create({
         model: 'claude-sonnet-4-6',
@@ -560,6 +655,7 @@ app.post('/webhook', async (req, res) => {
       });
       usuario.contrato.texto = atualizado.content[0].text;
       usuario.etapa = 'formato';
+      await salvarUsuario(usuario);
       await enviarMensagem(phone, `✅ Modificações aplicadas!\n\n${pedirFormato()}`);
       return res.sendStatus(200);
     }
@@ -570,29 +666,27 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.post('/kiwify', (req, res) => {
+app.post('/kiwify', async (req, res) => {
   try {
     const body = req.body;
     console.log('Kiwify webhook recebido');
-    console.log('Headers:', JSON.stringify(req.headers).substring(0, 300));
-    console.log('Body:', JSON.stringify(body).substring(0, 500));
 
     const token = req.query.token || body.token || req.headers['x-kiwify-token'] || '';
     console.log('Token recebido:', token);
 
-    const tokensValidos = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
-    if (token && tokensValidos.length > 0 && tokensValidos[0] !== '' && !tokensValidos.includes(token)) {
+    const tokensAvulso = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
+    const tokensIlimitado = (process.env.KIWIFY_TOKEN_ILIMITADO || '').split(',').map(t => t.trim());
+    const todosTokens = [...tokensAvulso, ...tokensIlimitado];
+
+    if (token && todosTokens.length > 0 && !todosTokens.includes(token)) {
       console.log('Token inválido:', token);
       return res.status(401).json({ error: 'Token inválido' });
     }
 
     const phone = body.Customer?.mobile?.replace(/\D/g, '');
-    if (!phone) {
-      console.log('Telefone não encontrado');
-      return res.sendStatus(200);
-    }
+    if (!phone) return res.sendStatus(200);
 
-    const usuario = getUsuario(phone);
+    const usuario = await getUsuario(phone);
     const status = body.order_status || body.subscription_status;
     console.log('Status:', status, '| Phone:', phone);
 
@@ -600,28 +694,27 @@ app.post('/kiwify', (req, res) => {
       usuario.plano = null;
       usuario.creditos = 0;
       usuario.dataExpiracao = null;
-      enviarMensagem(phone, `😢 Sua assinatura foi cancelada com sucesso.\n\nSeu acesso permanece ativo até o final do período pago.\n\nSe quiser voltar, é só escolher um novo plano:\n\n${menuPrincipal(false)}`);
+      await salvarUsuario(usuario);
+      enviarMensagem(phone, `😢 Sua assinatura foi cancelada.\n\nSeu acesso permanece ativo até o final do período pago.\n\nSe quiser voltar:\n\n${menuPrincipal(false)}`);
       return res.sendStatus(200);
     }
 
     if (status !== 'paid') return res.sendStatus(200);
 
-const tokensAvulso = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
-const tokenIlimitado = (process.env.KIWIFY_TOKEN_ILIMITADO || '').split(',').map(t => t.trim());
-
-if (tokenIlimitado.includes(token)) {
-  usuario.plano = 'ilimitado';
-  usuario.creditos = 999;
-  usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
-  console.log('Plano ilimitado liberado!');
-} else {
-  usuario.plano = 'avulso';
-  usuario.creditos = 1;
-  usuario.dataExpiracao = null;
-  console.log('Plano avulso liberado!');
-}
+    if (tokensIlimitado.includes(token)) {
+      usuario.plano = 'ilimitado';
+      usuario.creditos = 999;
+      usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
+      console.log('Plano ilimitado liberado!');
+    } else {
+      usuario.plano = 'avulso';
+      usuario.creditos = 1;
+      usuario.dataExpiracao = null;
+      console.log('Plano avulso liberado!');
+    }
 
     usuario.etapa = 'menu';
+    await salvarUsuario(usuario);
     console.log('Acesso liberado:', phone, '| Plano:', usuario.plano);
     enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(true)}`);
     res.sendStatus(200);
@@ -631,13 +724,12 @@ if (tokenIlimitado.includes(token)) {
   }
 });
 
-// Rota de teste — remover antes de ir ao ar oficial
-app.get('/teste', (req, res) => {
+app.get('/teste', async (req, res) => {
   const { phone, plano, senha } = req.query;
   if (senha !== 'matheus123') return res.status(401).json({ error: 'Senha inválida' });
   if (!phone) return res.status(400).json({ error: 'Phone obrigatório' });
 
-  const usuario = getUsuario(phone);
+  const usuario = await getUsuario(phone);
 
   if (plano === 'ilimitado') {
     usuario.plano = 'ilimitado';
@@ -650,17 +742,23 @@ app.get('/teste', (req, res) => {
   }
 
   usuario.etapa = 'menu';
+  await salvarUsuario(usuario);
   enviarMensagem(phone, `🎉 *Acesso de teste liberado!*\n\n${menuPrincipal(true)}`);
   res.json({ success: true, phone, plano: usuario.plano });
 });
 
-app.get('/avaliacoes', (req, res) => {
-  const media = avaliacoes.length > 0
-    ? (avaliacoes.reduce((a, b) => a + b.nota, 0) / avaliacoes.length).toFixed(1)
+app.get('/avaliacoes', async (req, res) => {
+  const result = await pool.query('SELECT * FROM avaliacoes ORDER BY created_at DESC');
+  const media = result.rows.length > 0
+    ? (result.rows.reduce((a, b) => a + b.nota, 0) / result.rows.length).toFixed(1)
     : 0;
-  res.json({ total: avaliacoes.length, media, avaliacoes });
+  res.json({ total: result.rows.length, media, avaliacoes: result.rows });
 });
 
 app.get('/', (req, res) => { res.json({ status: 'ContratoBot rodando!' }); });
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log('ContratoBot rodando na porta ' + PORT); });
+
+inicializarBanco().then(() => {
+  app.listen(PORT, () => { console.log('ContratoBot rodando na porta ' + PORT); });
+});
