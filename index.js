@@ -606,18 +606,20 @@ app.post('/kiwify', (req, res) => {
 
     if (status !== 'paid') return res.sendStatus(200);
 
-const preco = body.Product?.price || body.product?.price || body.Subscription?.plan?.price || body.subscription?.plan?.price || body.amount || body.total_price || 0;
-console.log('Preço:', preco);
-console.log('Produto completo:', JSON.stringify(body.Product || body.product || body.Subscription || body.subscription || {}));
-    if (preco <= 1999) {
-      usuario.plano = 'avulso';
-      usuario.creditos = 1;
-      usuario.dataExpiracao = null;
-    } else {
-      usuario.plano = 'ilimitado';
-      usuario.creditos = 999;
-      usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
-    }
+const tokensAvulso = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
+const tokenIlimitado = (process.env.KIWIFY_TOKEN_ILIMITADO || '').split(',').map(t => t.trim());
+
+if (tokenIlimitado.includes(token)) {
+  usuario.plano = 'ilimitado';
+  usuario.creditos = 999;
+  usuario.dataExpiracao = Date.now() + (30 * 24 * 60 * 60 * 1000);
+  console.log('Plano ilimitado liberado!');
+} else {
+  usuario.plano = 'avulso';
+  usuario.creditos = 1;
+  usuario.dataExpiracao = null;
+  console.log('Plano avulso liberado!');
+}
 
     usuario.etapa = 'menu';
     console.log('Acesso liberado:', phone, '| Plano:', usuario.plano);
