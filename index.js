@@ -205,15 +205,6 @@ const PERGUNTAS = {
   ]
 };
 
-const PERGUNTAS_MINIMAS = {
-  'Prestação de Serviços': 10,
-  'Aluguel de Imóvel': 15,
-  'Compra e Venda': 10,
-  'Contrato de Trabalho': 10,
-  'Parceria / Sociedade': 10,
-  'Outro': 5
-};
-
 async function validarResposta(pergunta, resposta) {
   if (resposta.trim().length < 3) return false;
   const respostasVazias = ['não sei', 'nao sei', 'talvez', 'depende', '?', '-', '.', 'ok', 'sim', 'nao', 'não'];
@@ -547,7 +538,7 @@ async function enviarContrato(phone, usuario, formato) {
   await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\n🔒 Não ficou satisfeito? Reembolso garantido em até 7 dias — digite *SUPORTE*.`);
 }
 
-app.post('/webhook', async (req, res) =>
+app.post('/webhook', async (req, res) => {
   try {
     const body = req.body;
     if (body.event !== 'messages.upsert') return res.sendStatus(200);
@@ -576,7 +567,6 @@ app.post('/webhook', async (req, res) =>
 
     if (usuario.etapa === 'gerando') return res.sendStatus(200);
 
-    // Verifica timeout de 24h para conversa em andamento
     if (usuario.etapa === 'coletando' && usuario.ultimaAtividade) {
       const horasInativo = (Date.now() - usuario.ultimaAtividade) / (1000 * 60 * 60);
       if (horasInativo > 24) {
@@ -587,7 +577,6 @@ app.post('/webhook', async (req, res) =>
       }
     }
 
-    // Verifica expiração
     if (planoExpirado(usuario)) {
       usuario.plano = null;
       usuario.creditos = 0;
@@ -597,7 +586,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Retomada de conversa
     if (usuario.etapa === 'retomada') {
       if (msg === '1') {
         usuario.etapa = 'coletando';
@@ -614,7 +602,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // PDF ou WORD a qualquer momento
     if (msgUpper === 'PDF' && usuario.contrato?.texto) {
       usuario.etapa = 'gerando';
       await salvarUsuario(usuario);
@@ -635,7 +622,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // MENU
     if (msgUpper === 'MENU') {
       usuario.etapa = 'menu';
       usuario.contrato = {};
@@ -644,13 +630,11 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // SUPORTE
     if (msgUpper === 'SUPORTE') {
       await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.`);
       return res.sendStatus(200);
     }
 
-    // CANCELAR PLANO
     if (msgUpper === 'CANCELAR PLANO') {
       if (usuario.plano === 'ilimitado') {
         await enviarMensagem(phone, `😢 Que pena que deseja cancelar seu plano!\n\nSua assinatura possui *renovação automática mensal*. Para cancelar e não ser cobrado no próximo mês, entre em contato:\n\n📧 contratobotsuporte@gmail.com\n\nVocê continuará tendo acesso até o final do período já pago.`);
@@ -660,7 +644,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Sem acesso
     if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario'].includes(usuario.etapa)) {
       if (msg === '1') {
         await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
@@ -672,7 +655,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Avaliação
     if (usuario.etapa === 'avaliacao') {
       const nota = parseInt(msg);
       if (nota >= 1 && nota <= 5) {
@@ -697,7 +679,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Escolha de formato
     if (usuario.etapa === 'formato') {
       if (msg === '1' || msgUpper === 'PDF') {
         usuario.etapa = 'gerando';
@@ -721,7 +702,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Menu principal
     if (usuario.etapa === 'menu') {
       if (TIPOS_CONTRATO[msg]) {
         const tipo = TIPOS_CONTRATO[msg];
@@ -735,12 +715,10 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Coletando dados
     if (usuario.etapa === 'coletando') {
       const { tipo, dados, perguntaAtual } = usuario.contrato;
       const perguntas = PERGUNTAS[tipo];
 
-      // Valida resposta
       const respostaValida = await validarResposta(perguntas[perguntaAtual], msg);
       if (!respostaValida) {
         await enviarMensagem(phone, `Por favor, responda com mais detalhes! 😊\n\n*Pergunta ${perguntaAtual + 1} de ${perguntas.length}:*\n${perguntas[perguntaAtual]}\n\nSe não quiser informar este dado, responda *"não informado"*.`);
@@ -755,7 +733,6 @@ app.post('/webhook', async (req, res) =>
         await salvarUsuario(usuario);
         await enviarMensagem(phone, `*Pergunta ${proxima + 1} de ${perguntas.length}:*\n${perguntas[proxima]}`);
       } else {
-        // Mostra resumo antes de gerar
         const resumo = dados.map((d, i) => `• ${perguntas[i].split('\n')[0].replace(/[*_]/g, '')}\n  _${d}_`).join('\n\n');
         usuario.contrato.dados = dados;
         usuario.etapa = 'confirmando';
@@ -765,7 +742,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Confirmação antes de gerar
     if (usuario.etapa === 'confirmando') {
       const { tipo, dados } = usuario.contrato;
       const perguntas = PERGUNTAS[tipo];
@@ -776,7 +752,6 @@ app.post('/webhook', async (req, res) =>
         await enviarMensagem(phone, `Gerando seu contrato... ⏳\n\nIsso pode levar alguns segundos!`);
         const textoContrato = await gerarContrato(tipo, dados, perguntas);
 
-        // Verifica inconsistências
         const verificacao = await verificarContrato(textoContrato);
         usuario.contrato.texto = textoContrato;
 
@@ -788,7 +763,6 @@ app.post('/webhook', async (req, res) =>
         await salvarUsuario(usuario);
         await enviarMensagem(phone, pedirFormato());
       } else {
-        // Tenta corrigir uma pergunta específica
         const num = parseInt(msg);
         if (num >= 1 && num <= perguntas.length) {
           usuario.contrato.corrigindo = num - 1;
@@ -802,7 +776,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Corrigindo uma resposta específica
     if (usuario.etapa === 'corrigindo') {
       const { tipo, dados, corrigindo } = usuario.contrato;
       const perguntas = PERGUNTAS[tipo];
@@ -815,7 +788,6 @@ app.post('/webhook', async (req, res) =>
       return res.sendStatus(200);
     }
 
-    // Revisão
     if (usuario.etapa === 'revisao') {
       if (msgUpper === 'NOVO') {
         usuario.etapa = 'avaliacao';
