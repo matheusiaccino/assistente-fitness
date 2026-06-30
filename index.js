@@ -545,8 +545,9 @@ async function enviarContrato(phone, usuario, formato) {
     await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
   }
   await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\n🔒 Não ficou satisfeito? Reembolso garantido em até 7 dias — digite *SUPORTE*.`);
+}
 
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', async (req, res) =>
   try {
     const body = req.body;
     if (body.event !== 'messages.upsert') return res.sendStatus(200);
