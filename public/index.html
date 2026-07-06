@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ContratoBot — Contrato pronto pelo WhatsApp</title>
+  <meta name="description" content="Gere contratos profissionais em minutos pelo WhatsApp. Receba em PDF e Word. A partir de R$ 14,99." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0F1F3D;
+      --navy-light: #1A3260;
+      --green: #22C55E;
+      --green-dark: #16A34A;
+      --green-glow: rgba(34, 197, 94, 0.18);
+      --white: #FFFFFF;
+      --gray: #94A3B8;
+      --bg: #0A1628;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--white);
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+    }
+
+    /* ── LOGO ── */
+    .logo-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .logo-wrap img {
+      width: 180px;
+      height: auto;
+      /* white background logo needs a subtle shadow to float on dark bg */
+      filter: drop-shadow(0 4px 24px rgba(34,197,94,0.25));
+    }
+
+    /* ── TAGLINE ── */
+    .tagline {
+      font-size: 15px;
+      color: var(--gray);
+      text-align: center;
+      max-width: 300px;
+      line-height: 1.5;
+      margin-bottom: 36px;
+    }
+
+    .tagline span {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    /* ── BUTTONS ── */
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 18px 24px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+      cursor: pointer;
+      border: none;
+      letter-spacing: 0.01em;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    /* PRIMARY — CTA */
+    .btn-primary {
+      background: var(--green);
+      color: var(--navy);
+      box-shadow: 0 0 32px var(--green-glow), 0 4px 16px rgba(0,0,0,0.3);
+      font-size: 17px;
+    }
+
+    .btn-primary:hover {
+      background: var(--green-dark);
+      box-shadow: 0 0 48px rgba(34,197,94,0.35), 0 4px 20px rgba(0,0,0,0.35);
+      transform: translateY(-2px);
+    }
+
+    /* SECONDARY */
+    .btn-secondary {
+      background: var(--navy-light);
+      color: var(--white);
+      border: 1.5px solid rgba(255,255,255,0.1);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    }
+
+    .btn-secondary:hover {
+      background: #1e3d75;
+      border-color: rgba(34,197,94,0.35);
+      transform: translateY(-2px);
+    }
+
+    /* ICON */
+    .btn-icon {
+      font-size: 22px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    /* ── PRICE BADGE ── */
+    .price-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .badge {
+      background: rgba(34,197,94,0.12);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 100px;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 48px;
+      font-size: 12px;
+      color: rgba(148,163,184,0.5);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGO -->
+  <div class="logo-wrap">
+    <!-- Substitua o src abaixo pelo caminho real da sua logo após hospedar -->
+    <img src="logo.png" alt="ContratoBot" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block'" />
+    <div id="logo-text" style="display:none; font-size:32px; font-weight:800; color:#fff; margin-bottom:8px;">
+      CONTRATO<span style="color:#22C55E">BOT</span>
+    </div>
+  </div>
+
+  <!-- TAGLINE -->
+  <p class="tagline">
+    Seu contrato no <span>WhatsApp</span>,<br>de forma simples, rápida e segura.
+  </p>
+
+  <!-- PRICE BADGES -->
+  <div class="price-row">
+    <span class="badge">Avulso R$ 14,99</span>
+    <span class="badge">Ilimitado R$ 49,99/mês</span>
+  </div>
+
+  <!-- BUTTONS -->
+  <div class="buttons">
+
+    <a class="btn btn-primary"
+       href="https://wa.me/5569999280085?text=Olá!%20Quero%20gerar%20um%20contrato%20agora"
+       target="_blank" rel="noopener">
+      <span class="btn-icon">📄</span>
+      Gerar meu contrato agora
+    </a>
+
+    <a class="btn btn-secondary"
+       href="https://wa.me/5569999280085?text=Olá!%20Preciso%20de%20suporte"
+       target="_blank" rel="noopener">
+      <span class="btn-icon">💬</span>
+      Suporte
+    </a>
+
+    <a class="btn btn-secondary"
+       href="https://g.page/r/LINK_GOOGLE_MINHA_EMPRESA/review"
+       target="_blank" rel="noopener">
+      <span class="btn-icon">⭐</span>
+      Nos avalie no Google
+    </a>
+
+  </div>
+
+  <p class="footer">© 2026 ContratoBot · contratobot.com.br</p>
+
+</body>
+</html>
