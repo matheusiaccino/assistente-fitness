@@ -707,7 +707,7 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario'].includes(usuario.etapa)) {
+    if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario', 'revisao'].includes(usuario.etapa)) {
       if (msg === '1') {
         if (!process.env.LINK_AVULSO) {
           console.error('LINK_AVULSO não configurado!');
