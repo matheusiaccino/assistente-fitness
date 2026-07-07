@@ -1,7 +1,13 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 app.use(express.static('public'));
 app.use(express.json());
+
+app.get('/suporte', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'suporte.html'));
+});
+
 const Anthropic = require('@anthropic-ai/sdk');
 const PDFDocument = require('pdfkit');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ContratoBot — Contrato pronto pelo WhatsApp</title>
-  <meta name="description" content="Gere contratos profissionais em minutos pelo WhatsApp. Receba em PDF e Word. A partir de R$ 14,99." />
+  <title>Suporte — ContratoBot</title>
+  <meta name="description" content="Precisa de ajuda com o ContratoBot? Fale com nossa equipe de suporte." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
@@ -46,23 +46,66 @@
     .logo-wrap img {
       width: 180px;
       height: auto;
-      /* white background logo needs a subtle shadow to float on dark bg */
       filter: drop-shadow(0 4px 24px rgba(34,197,94,0.25));
     }
 
-    /* ── TAGLINE ── */
-    .tagline {
+    /* ── TITLE ── */
+    .title {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 12px 0 8px;
+      text-align: center;
+    }
+
+    .subtitle {
       font-size: 15px;
       color: var(--gray);
       text-align: center;
-      max-width: 300px;
+      max-width: 320px;
       line-height: 1.5;
-      margin-bottom: 36px;
+      margin-bottom: 32px;
     }
 
-    .tagline span {
+    /* ── SUPPORT CARD ── */
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--navy-light);
+      border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      margin-bottom: 28px;
+    }
+
+    .card-label {
+      font-size: 13px;
+      color: var(--gray);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .email-link {
+      display: inline-block;
+      font-size: 18px;
+      font-weight: 700;
       color: var(--green);
-      font-weight: 600;
+      text-decoration: none;
+      word-break: break-word;
+    }
+
+    .email-link:hover {
+      color: var(--green-dark);
+      text-decoration: underline;
+    }
+
+    .card-note {
+      font-size: 13px;
+      color: var(--gray);
+      margin-top: 16px;
+      line-height: 1.5;
     }
 
     /* ── BUTTONS ── */
@@ -94,21 +137,6 @@
       transform: scale(0.97);
     }
 
-    /* PRIMARY — CTA */
-    .btn-primary {
-      background: var(--green);
-      color: var(--navy);
-      box-shadow: 0 0 32px var(--green-glow), 0 4px 16px rgba(0,0,0,0.3);
-      font-size: 17px;
-    }
-
-    .btn-primary:hover {
-      background: var(--green-dark);
-      box-shadow: 0 0 48px rgba(34,197,94,0.35), 0 4px 20px rgba(0,0,0,0.35);
-      transform: translateY(-2px);
-    }
-
-    /* SECONDARY */
     .btn-secondary {
       background: var(--navy-light);
       color: var(--white);
@@ -122,30 +150,10 @@
       transform: translateY(-2px);
     }
 
-    /* ICON */
     .btn-icon {
       font-size: 22px;
       line-height: 1;
       flex-shrink: 0;
-    }
-
-    /* ── PRICE BADGE ── */
-    .price-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .badge {
-      background: rgba(34,197,94,0.12);
-      border: 1px solid rgba(34,197,94,0.3);
-      color: var(--green);
-      font-size: 13px;
-      font-weight: 600;
-      padding: 6px 14px;
-      border-radius: 100px;
     }
 
     /* ── FOOTER ── */
@@ -161,47 +169,28 @@
 
   <!-- LOGO -->
   <div class="logo-wrap">
-    <!-- Substitua o src abaixo pelo caminho real da sua logo após hospedar -->
     <img src="logo.png" alt="ContratoBot" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block'" />
     <div id="logo-text" style="display:none; font-size:32px; font-weight:800; color:#fff; margin-bottom:8px;">
       CONTRATO<span style="color:#22C55E">BOT</span>
     </div>
   </div>
 
-  <!-- TAGLINE -->
-  <p class="tagline">
-    Seu contrato no <span>WhatsApp</span>,<br>de forma simples, rápida e segura.
-  </p>
+  <h1 class="title">Suporte</h1>
+  <p class="subtitle">Precisa de ajuda? Fale diretamente com nossa equipe pelo e-mail abaixo.</p>
 
-  <!-- PRICE BADGES -->
-  <div class="price-row">
-    <span class="badge">Avulso R$ 14,99</span>
-    <span class="badge">Ilimitado R$ 49,99/mês</span>
+  <!-- SUPPORT CARD -->
+  <div class="card">
+    <div class="card-label">E-mail de suporte</div>
+    <a class="email-link" href="mailto:contratobotsuporte@gmail.com">contratobotsuporte@gmail.com</a>
+    <p class="card-note">Descreva seu problema com detalhes. Respondemos em até 24h úteis, de segunda a sexta, das 8h às 18h.</p>
   </div>
 
   <!-- BUTTONS -->
   <div class="buttons">
-
-    <a class="btn btn-primary"
-       href="https://wa.me/5569999280085?text=Olá!%20Quero%20gerar%20um%20contrato%20agora"
-       target="_blank" rel="noopener">
-      <span class="btn-icon">📄</span>
-      Gerar meu contrato agora
+    <a class="btn btn-secondary" href="/">
+      <span class="btn-icon">←</span>
+      Voltar para contratobot.com.br
     </a>
-
-    <a class="btn btn-secondary"
-       href="/suporte">
-      <span class="btn-icon">💬</span>
-      Suporte
-    </a>
-
-    <a class="btn btn-secondary"
-       href="https://g.page/r/LINK_GOOGLE_MINHA_EMPRESA/review"
-       target="_blank" rel="noopener">
-      <span class="btn-icon">⭐</span>
-      Nos avalie no Google
-    </a>
-
   </div>
 
   <p class="footer">© 2026 ContratoBot · contratobot.com.br</p>
