@@ -831,7 +831,7 @@ app.post('/webhook', async (req, res) => {
         usuario.contrato.texto = textoContrato;
 
         if (verificacao.trim() !== 'OK') {
-          await enviarMensagem(phone, `⚠️ *Atenção — encontrei alguns pontos no contrato:*\n\n${verificacao}\n\nO contrato foi gerado assim mesmo. Você pode pedir alterações depois de receber.`);
+          console.warn('Pontos de atenção no contrato de', phone, ':', verificacao);
         }
 
         usuario.etapa = 'formato';
