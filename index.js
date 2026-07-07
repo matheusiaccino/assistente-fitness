@@ -514,8 +514,6 @@ Um contrato completo com direito a modificações
 Contratos ilimitados com renovação automática ♾️
 Cancele quando quiser digitando *CANCELAR PLANO*${dicas}
 
-🔒 *Garantia:* não ficou satisfeito? Reembolso garantido em até 7 dias via SUPORTE.
-
 Responda *1* ou *2* para continuar.`;
 }
 
@@ -574,7 +572,7 @@ async function enviarContrato(phone, usuario, formato) {
     const wordBuffer = await gerarWord(usuario.contrato.texto);
     await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
   }
-  await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\n🔒 Não ficou satisfeito? Reembolso garantido em até 7 dias — digite *SUPORTE*.`);
+  await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\nQualquer dúvida, digite *SUPORTE*.`);
 }
 
 app.post('/webhook', async (req, res) => {
@@ -696,7 +694,7 @@ app.post('/webhook', async (req, res) => {
     }
 
     if (msgUpper === 'SUPORTE') {
-      await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.`);
+      await enviarMensagem(phone, `🆘 *Suporte ContratoBot*\n\nOlá! Para falar com nossa equipe:\n\n📧 E-mail: contratobotsuporte@gmail.com\n\nDescreva seu problema detalhadamente e responderemos em até 24h úteis! 😊\n\nHorário de atendimento: Segunda a Sexta, das 8h às 18h.\n\n🔒 Não ficou satisfeito? Você tem direito a reembolso em até 7 dias — é só pedir por aqui.`);
       return res.sendStatus(200);
     }
 
