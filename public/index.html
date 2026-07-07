@@ -7,6 +7,14 @@
   <meta name="description" content="Gere contratos profissionais em minutos pelo WhatsApp. Receba em PDF e Word. A partir de R$ 14,99." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Google tag (gtag.js) — rastreamento de conversão do Google Ads -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18294955020"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-18294955020');
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -243,7 +251,7 @@
   <!-- BUTTONS -->
   <div class="buttons">
 
-    <a class="btn btn-primary"
+    <a id="cta-whatsapp" class="btn btn-primary"
        href="https://wa.me/5569999280085?text=Olá!%20Quero%20gerar%20um%20contrato%20agora"
        target="_blank" rel="noopener">
       <span class="btn-icon">📄</span>
@@ -271,6 +279,14 @@
   <p class="footer">© 2026 ContratoBot · contratobot.com.br</p>
 
   <script>
+    document.getElementById('cta-whatsapp').addEventListener('click', function () {
+      gtag('event', 'conversion', {
+        'send_to': 'AW-18294955020/K0POCLCbyMwcEIy425NE',
+        'value': 1.0,
+        'currency': 'BRL'
+      });
+    });
+
     fetch('/api/depoimentos')
       .then(r => r.json())
       .then(data => {
