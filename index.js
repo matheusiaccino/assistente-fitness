@@ -223,6 +223,11 @@ async function validarResposta(pergunta, resposta) {
   return true;
 }
 
+function extrairTexto(response) {
+  const bloco = response.content.find(b => b.type === 'text');
+  return bloco ? bloco.text : '';
+}
+
 async function gerarContrato(tipo, dados, perguntas) {
   let instrucaoEspecial = '';
 
@@ -268,7 +273,7 @@ Gere o contrato completo agora.`;
     max_tokens: 4000,
     messages: [{ role: 'user', content: prompt }]
   });
-  return response.content[0].text;
+  return extrairTexto(response);
 }
 
 async function verificarContrato(textoContrato) {
@@ -287,7 +292,7 @@ Responda em formato simples, em português, listando apenas os problemas encontr
     max_tokens: 500,
     messages: [{ role: 'user', content: prompt }]
   });
-  return response.content[0].text;
+  return extrairTexto(response);
 }
 
 function gerarPDF(textoContrato) {
@@ -893,7 +898,7 @@ app.post('/webhook', async (req, res) => {
           { role: 'user', content: `Faça as seguintes modificações: ${msg}\n\nRetorne o contrato completo com as modificações, usando as mesmas marcações [TITULO], [CLAUSULA] e [NEGRITO].` }
         ]
       });
-      usuario.contrato.texto = atualizado.content[0].text;
+      usuario.contrato.texto = extrairTexto(atualizado);
       usuario.etapa = 'formato';
       await salvarUsuario(usuario);
       await enviarMensagem(phone, `✅ Modificações aplicadas!\n\n${pedirFormato()}`);
