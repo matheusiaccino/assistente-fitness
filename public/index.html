@@ -148,6 +148,67 @@
       border-radius: 100px;
     }
 
+    /* ── DEPOIMENTOS ── */
+    .reviews {
+      width: 100%;
+      max-width: 400px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .reviews-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .reviews-summary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .reviews-stars {
+      color: #FACC15;
+      font-size: 20px;
+      letter-spacing: 2px;
+    }
+
+    .reviews-meta {
+      font-size: 14px;
+      color: var(--gray);
+      font-weight: 600;
+    }
+
+    .reviews-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .review-card {
+      background: var(--navy-light);
+      border: 1.5px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px 18px;
+      text-align: left;
+    }
+
+    .review-card-stars {
+      color: #FACC15;
+      font-size: 13px;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .review-card-text {
+      font-size: 14px;
+      color: var(--white);
+      line-height: 1.5;
+    }
+
     /* ── FOOTER ── */
     .footer {
       margin-top: 48px;
@@ -195,16 +256,47 @@
       Suporte
     </a>
 
-    <a class="btn btn-secondary"
-       href="https://g.page/r/LINK_GOOGLE_MINHA_EMPRESA/review"
-       target="_blank" rel="noopener">
-      <span class="btn-icon">⭐</span>
-      Nos avalie no Google
-    </a>
-
   </div>
 
+  <!-- DEPOIMENTOS (preenchido via /api/depoimentos; fica oculto se ainda houver poucas avaliações) -->
+  <section id="depoimentos" class="reviews" hidden>
+    <h2 class="reviews-title">O que nossos clientes dizem</h2>
+    <div class="reviews-summary">
+      <span id="reviews-stars" class="reviews-stars"></span>
+      <span id="reviews-meta" class="reviews-meta"></span>
+    </div>
+    <div id="reviews-cards" class="reviews-cards"></div>
+  </section>
+
   <p class="footer">© 2026 ContratoBot · contratobot.com.br</p>
+
+  <script>
+    fetch('/api/depoimentos')
+      .then(r => r.json())
+      .then(data => {
+        if (!data || data.total < 3) return;
+        const section = document.getElementById('depoimentos');
+        const cheias = Math.round(data.media);
+        document.getElementById('reviews-stars').textContent = '★'.repeat(cheias) + '☆'.repeat(5 - cheias);
+        document.getElementById('reviews-meta').textContent = data.media.toFixed(1).replace('.', ',') + ' · ' + data.total + ' avaliações de clientes';
+        const cards = document.getElementById('reviews-cards');
+        (data.depoimentos || []).slice(0, 4).forEach(d => {
+          const card = document.createElement('div');
+          card.className = 'review-card';
+          const stars = document.createElement('div');
+          stars.className = 'review-card-stars';
+          stars.textContent = '★'.repeat(d.nota);
+          const text = document.createElement('p');
+          text.className = 'review-card-text';
+          text.textContent = '“' + d.comentario + '”';
+          card.appendChild(stars);
+          card.appendChild(text);
+          cards.appendChild(card);
+        });
+        section.hidden = false;
+      })
+      .catch(() => {});
+  </script>
 
 </body>
 </html>

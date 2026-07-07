@@ -40,6 +40,7 @@ async function inicializarBanco() {
       )
     `);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS contrato_corrigindo INTEGER`);
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS followup_enviado INTEGER DEFAULT 0`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS avaliacoes (
         id SERIAL PRIMARY KEY,
@@ -70,6 +71,7 @@ async function getUsuario(phone) {
       dataExpiracao: row.data_expiracao ? parseInt(row.data_expiracao) : null,
       ultimaNota: row.ultima_nota,
       ultimaAtividade: row.ultima_atividade ? parseInt(row.ultima_atividade) : null,
+      followupEnviado: row.followup_enviado || 0,
       contrato: {
         tipo: row.contrato_tipo,
         dados: row.contrato_dados ? JSON.parse(row.contrato_dados) : [],
@@ -87,12 +89,12 @@ async function getUsuario(phone) {
 async function salvarUsuario(usuario) {
   try {
     await pool.query(`
-      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_corrigindo, contrato_texto, ultima_nota, ultima_atividade, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_corrigindo, contrato_texto, ultima_nota, ultima_atividade, followup_enviado, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
       ON CONFLICT (phone) DO UPDATE SET
         plano = $2, creditos = $3, data_expiracao = $4, etapa = $5,
         contrato_tipo = $6, contrato_dados = $7, contrato_pergunta = $8,
-        contrato_corrigindo = $9, contrato_texto = $10, ultima_nota = $11, ultima_atividade = $12, updated_at = NOW()
+        contrato_corrigindo = $9, contrato_texto = $10, ultima_nota = $11, ultima_atividade = $12, followup_enviado = $13, updated_at = NOW()
     `, [
       usuario.phone,
       usuario.plano,
@@ -105,7 +107,8 @@ async function salvarUsuario(usuario) {
       usuario.contrato?.corrigindo ?? null,
       usuario.contrato?.texto || null,
       usuario.ultimaNota || null,
-      Date.now()
+      Date.now(),
+      usuario.followupEnviado || 0
     ]);
   } catch (error) {
     console.error('Erro ao salvar usuario:', error);
@@ -572,7 +575,11 @@ async function enviarContrato(phone, usuario, formato) {
     const wordBuffer = await gerarWord(usuario.contrato.texto);
     await enviarArquivo(phone, wordBuffer, `Contrato_${tipo.replace(/ /g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '📝 Seu contrato em Word está pronto!');
   }
-  await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\nQualquer dúvida, digite *SUPORTE*.`);
+  let upsell = '';
+  if (usuario.plano === 'avulso' && process.env.LINK_ILIMITADO) {
+    upsell = `\n\n♾️ *Gostou? Tenha contratos ilimitados!*\nPor R$ 49,99/mês você gera quantos contratos quiser, sempre que precisar:\n🔗 ${process.env.LINK_ILIMITADO}`;
+  }
+  await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\nQualquer dúvida, digite *SUPORTE*.${upsell}`);
 }
 
 app.post('/webhook', async (req, res) => {
@@ -601,6 +608,11 @@ app.post('/webhook', async (req, res) => {
     const msg = texto.trim();
     const msgUpper = msg.toUpperCase();
     console.log('Mensagem de', phone, ':', msg, '| Etapa:', usuario.etapa);
+
+    if (usuario.followupEnviado) {
+      usuario.followupEnviado = 0;
+      pool.query('UPDATE usuarios SET followup_enviado = 0 WHERE phone = $1', [phone]).catch(() => {});
+    }
 
     if (usuario.etapa === 'gerando') return res.sendStatus(200);
 
@@ -713,6 +725,8 @@ app.post('/webhook', async (req, res) => {
           console.error('LINK_AVULSO não configurado!');
           await enviarMensagem(phone, `⚠️ Estamos com um problema técnico para gerar seu link de pagamento.\n\nPor favor, digite *SUPORTE* que já te ajudamos a finalizar a compra.`);
         } else {
+          usuario.etapa = 'aguardando_pagamento';
+          await salvarUsuario(usuario);
           await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
         }
       } else if (msg === '2') {
@@ -720,9 +734,13 @@ app.post('/webhook', async (req, res) => {
           console.error('LINK_ILIMITADO não configurado!');
           await enviarMensagem(phone, `⚠️ Estamos com um problema técnico para gerar seu link de pagamento.\n\nPor favor, digite *SUPORTE* que já te ajudamos a finalizar a compra.`);
         } else {
+          usuario.etapa = 'aguardando_pagamento';
+          await salvarUsuario(usuario);
           await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 49,99/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
         }
       } else {
+        usuario.etapa = 'menu';
+        await salvarUsuario(usuario);
         await enviarMensagem(phone, menuPrincipal(null));
       }
       return res.sendStatus(200);
@@ -951,6 +969,7 @@ app.post('/kiwify', async (req, res) => {
     }
 
     usuario.etapa = 'menu';
+    usuario.followupEnviado = 0;
     await salvarUsuario(usuario);
     enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(usuario)}`);
     res.sendStatus(200);
@@ -982,6 +1001,9 @@ app.get('/teste', async (req, res) => {
 });
 
 app.get('/avaliacoes', async (req, res) => {
+  if (!process.env.TESTE_SENHA || req.query.senha !== process.env.TESTE_SENHA) {
+    return res.status(401).json({ error: 'Senha inválida' });
+  }
   const result = await pool.query('SELECT * FROM avaliacoes ORDER BY created_at DESC');
   const media = result.rows.length > 0
     ? (result.rows.reduce((a, b) => a + b.nota, 0) / result.rows.length).toFixed(1)
@@ -989,9 +1011,78 @@ app.get('/avaliacoes', async (req, res) => {
   res.json({ total: result.rows.length, media, avaliacoes: result.rows });
 });
 
+app.get('/api/depoimentos', async (req, res) => {
+  try {
+    const stats = await pool.query('SELECT COUNT(*) AS total, COALESCE(AVG(nota), 0) AS media FROM avaliacoes');
+    const depoimentos = await pool.query(`
+      SELECT nota, comentario FROM avaliacoes
+      WHERE nota >= 4 AND comentario IS NOT NULL AND LENGTH(TRIM(comentario)) >= 10
+      ORDER BY created_at DESC LIMIT 6
+    `);
+    res.json({
+      total: parseInt(stats.rows[0].total),
+      media: parseFloat(parseFloat(stats.rows[0].media).toFixed(1)),
+      depoimentos: depoimentos.rows
+    });
+  } catch (error) {
+    console.error('Erro ao buscar depoimentos:', error);
+    res.json({ total: 0, media: 0, depoimentos: [] });
+  }
+});
+
+async function verificarInativos() {
+  try {
+    const agora = Date.now();
+    const umaHora = 60 * 60 * 1000;
+
+    const result = await pool.query(`
+      SELECT phone, etapa, plano, creditos, ultima_atividade FROM usuarios
+      WHERE followup_enviado = 0
+        AND ultima_atividade IS NOT NULL
+        AND etapa IN ('menu', 'aguardando_pagamento', 'coletando', 'confirmando', 'revisao')
+    `);
+
+    for (const row of result.rows) {
+      const inativoMs = agora - parseInt(row.ultima_atividade);
+      let mensagem = null;
+      let novaEtapa = null;
+
+      if (row.etapa === 'menu' && !row.plano && row.creditos === 0 && inativoMs >= umaHora && inativoMs < 24 * umaHora) {
+        mensagem = `Oi! 👋 Ainda precisa daquele contrato?\n\nEm 5 minutos você responde algumas perguntas e recebe seu contrato profissional em PDF e Word, pronto para assinar. ⚡\n\n*1️⃣ Contrato Avulso — R$ 14,99*\n*2️⃣ Plano Ilimitado — R$ 49,99/mês*\n\nResponda *1* ou *2* para começar. Qualquer dúvida, digite *SUPORTE*. 😊`;
+      } else if (row.etapa === 'aguardando_pagamento' && inativoMs >= umaHora) {
+        mensagem = `Oi! 👋 Vi que você ainda não finalizou o pagamento.\n\nFicou alguma dúvida? Seu contrato profissional fica pronto em poucos minutos! ⚡\n\n*Contrato Avulso — R$ 14,99:*\n🔗 ${process.env.LINK_AVULSO}\n\n*Plano Ilimitado — R$ 49,99/mês:*\n🔗 ${process.env.LINK_ILIMITADO}\n\nQualquer dúvida é só digitar *SUPORTE*. 😊`;
+      } else if ((row.etapa === 'coletando' || row.etapa === 'confirmando') && inativoMs >= 2 * umaHora && inativoMs < 24 * umaHora) {
+        const usuario = await getUsuario(row.phone);
+        if (row.etapa === 'coletando' && usuario.contrato?.tipo) {
+          const perguntas = PERGUNTAS[usuario.contrato.tipo];
+          const atual = usuario.contrato.perguntaAtual;
+          mensagem = `Oi! 👋 Seu contrato de *${usuario.contrato.tipo}* está quase pronto — faltam só ${perguntas.length - atual} pergunta(s)!\n\n*Pergunta ${atual + 1} de ${perguntas.length}:*\n${perguntas[atual]}`;
+        } else if (row.etapa === 'confirmando') {
+          mensagem = `Oi! 👋 Seu contrato está pronto para ser gerado — falta só confirmar!\n\n✅ Digite *SIM* para gerar agora\n✏️ Ou o número da pergunta que deseja corrigir`;
+        }
+      } else if (row.etapa === 'revisao' && inativoMs >= 24 * umaHora) {
+        mensagem = pedirAvaliacao();
+        novaEtapa = 'avaliacao';
+      }
+
+      if (mensagem) {
+        await pool.query(
+          'UPDATE usuarios SET followup_enviado = 1' + (novaEtapa ? ", etapa = '" + novaEtapa + "'" : '') + ' WHERE phone = $1',
+          [row.phone]
+        );
+        await enviarMensagem(row.phone, mensagem);
+        console.log('Follow-up enviado para', row.phone, '| Etapa:', row.etapa);
+      }
+    }
+  } catch (error) {
+    console.error('Erro no verificarInativos:', error);
+  }
+}
+
 app.get('/', (req, res) => { res.json({ status: 'ContratoBot rodando!' }); });
 
 const PORT = process.env.PORT || 3000;
 inicializarBanco().then(() => {
   app.listen(PORT, () => { console.log('ContratoBot rodando na porta ' + PORT); });
+  setInterval(verificarInativos, 10 * 60 * 1000);
 });
