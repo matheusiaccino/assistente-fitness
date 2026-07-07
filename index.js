@@ -32,12 +32,14 @@ async function inicializarBanco() {
         contrato_tipo VARCHAR(50),
         contrato_dados TEXT,
         contrato_pergunta INTEGER DEFAULT 0,
+        contrato_corrigindo INTEGER,
         contrato_texto TEXT,
         ultima_nota INTEGER,
         ultima_atividade BIGINT,
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS contrato_corrigindo INTEGER`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS avaliacoes (
         id SERIAL PRIMARY KEY,
@@ -72,6 +74,7 @@ async function getUsuario(phone) {
         tipo: row.contrato_tipo,
         dados: row.contrato_dados ? JSON.parse(row.contrato_dados) : [],
         perguntaAtual: row.contrato_pergunta || 0,
+        corrigindo: row.contrato_corrigindo,
         texto: row.contrato_texto
       }
     };
@@ -84,12 +87,12 @@ async function getUsuario(phone) {
 async function salvarUsuario(usuario) {
   try {
     await pool.query(`
-      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_texto, ultima_nota, ultima_atividade, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+      INSERT INTO usuarios (phone, plano, creditos, data_expiracao, etapa, contrato_tipo, contrato_dados, contrato_pergunta, contrato_corrigindo, contrato_texto, ultima_nota, ultima_atividade, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
       ON CONFLICT (phone) DO UPDATE SET
         plano = $2, creditos = $3, data_expiracao = $4, etapa = $5,
         contrato_tipo = $6, contrato_dados = $7, contrato_pergunta = $8,
-        contrato_texto = $9, ultima_nota = $10, ultima_atividade = $11, updated_at = NOW()
+        contrato_corrigindo = $9, contrato_texto = $10, ultima_nota = $11, ultima_atividade = $12, updated_at = NOW()
     `, [
       usuario.phone,
       usuario.plano,
@@ -99,6 +102,7 @@ async function salvarUsuario(usuario) {
       usuario.contrato?.tipo || null,
       usuario.contrato?.dados ? JSON.stringify(usuario.contrato.dados) : null,
       usuario.contrato?.perguntaAtual || 0,
+      usuario.contrato?.corrigindo ?? null,
       usuario.contrato?.texto || null,
       usuario.ultimaNota || null,
       Date.now()
