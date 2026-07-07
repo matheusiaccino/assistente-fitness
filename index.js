@@ -510,6 +510,18 @@ Cancele quando quiser digitando *CANCELAR PLANO*${dicas}
 Responda *1* ou *2* para continuar.`;
 }
 
+function mensagemContinuar(usuario) {
+  const { tipo, dados, perguntaAtual } = usuario.contrato;
+  const perguntas = PERGUNTAS[tipo];
+
+  if (usuario.etapa === 'coletando') {
+    return `Continuando seu contrato de *${tipo}*! 📋\n\n*Pergunta ${perguntaAtual + 1} de ${perguntas.length}:*\n${perguntas[perguntaAtual]}`;
+  }
+
+  const resumo = dados.map((d, i) => `• ${perguntas[i].split('\n')[0].replace(/[*_]/g, '')}\n  _${d}_`).join('\n\n');
+  return `Continuando seu contrato de *${tipo}*! 📋\n\nAqui está o resumo das informações:\n\n${resumo}\n\n✅ Digite *SIM* para gerar o contrato\n✏️ Digite o número da pergunta para corrigir (ex: *3* para corrigir a pergunta 3)`;
+}
+
 function pedirFormato() {
   return `Em qual formato você prefere receber o contrato?
 
@@ -517,6 +529,17 @@ function pedirFormato() {
 2️⃣ Word (.docx) (para editar antes de assinar)
 
 💡 Você também pode digitar *PDF* ou *WORD* a qualquer momento para receber o contrato no formato desejado.`;
+}
+
+function ehMensagemEncerramento(msg) {
+  const palavrasPermitidas = new Set([
+    'obrigado', 'obrigada', 'brigado', 'brigada', 'valeu', 'vlw', 'blz', 'beleza',
+    'ok', 'okay', 'show', 'perfeito', 'otimo', 'ótimo', 'top', 'legal', 'de', 'nada',
+    'muito', 'demais', 'bastante', 'bom'
+  ]);
+  const limpo = msg.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w\s]/g, '').trim();
+  const palavras = limpo.split(/\s+/).filter(Boolean);
+  return palavras.length > 0 && palavras.every(p => palavrasPermitidas.has(p));
 }
 
 function pedirAvaliacao() {
@@ -609,6 +632,22 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    if (usuario.etapa.startsWith('confirmar_menu_')) {
+      if (msg === '1') {
+        usuario.etapa = 'menu';
+        usuario.contrato = {};
+        await salvarUsuario(usuario);
+        await enviarMensagem(phone, menuPrincipal(usuario));
+      } else if (msg === '2') {
+        usuario.etapa = usuario.etapa.replace('confirmar_menu_', '');
+        await salvarUsuario(usuario);
+        await enviarMensagem(phone, mensagemContinuar(usuario));
+      } else {
+        await enviarMensagem(phone, `Responda *1* para cancelar e voltar ao menu, ou *2* para continuar de onde parou.`);
+      }
+      return res.sendStatus(200);
+    }
+
     if (msgUpper === 'PDF' && usuario.contrato?.texto) {
       usuario.etapa = 'gerando';
       await salvarUsuario(usuario);
@@ -630,6 +669,16 @@ app.post('/webhook', async (req, res) => {
     }
 
     if (msgUpper === 'MENU') {
+      const estadosEmAndamento = { coletando: 'coletando', confirmando: 'confirmando', corrigindo: 'confirmando' };
+      const estadoResumo = estadosEmAndamento[usuario.etapa];
+
+      if (estadoResumo) {
+        usuario.etapa = 'confirmar_menu_' + estadoResumo;
+        await salvarUsuario(usuario);
+        await enviarMensagem(phone, `⚠️ Você tem um contrato de *${usuario.contrato.tipo}* em andamento. Se voltar ao menu agora, vai perder todo o progresso preenchido até aqui.\n\n1️⃣ Sim, cancelar e voltar ao menu\n2️⃣ Não, continuar de onde parei`);
+        return res.sendStatus(200);
+      }
+
       usuario.etapa = 'menu';
       usuario.contrato = {};
       await salvarUsuario(usuario);
@@ -813,6 +862,11 @@ app.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
       }
 
+      if (ehMensagemEncerramento(msg)) {
+        await enviarMensagem(phone, `De nada! 😊\n\nSe precisar de mais alguma coisa:\n• Digite *PDF* ou *WORD* para receber o contrato novamente\n• Digite *NOVO* para gerar outro contrato\n• Ou me diga o que deseja alterar no contrato atual`);
+        return res.sendStatus(200);
+      }
+
       usuario.etapa = 'gerando';
       await salvarUsuario(usuario);
       await enviarMensagem(phone, `Aplicando as modificações... ⏳`);
@@ -844,11 +898,11 @@ app.post('/kiwify', async (req, res) => {
     const token = req.query.token || body.token || req.headers['x-kiwify-token'] || '';
     console.log('Kiwify webhook | Token:', token);
 
-    const tokensAvulso = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim());
-    const tokensIlimitado = (process.env.KIWIFY_TOKEN_ILIMITADO || '').split(',').map(t => t.trim());
+    const tokensAvulso = (process.env.KIWIFY_TOKEN || '').split(',').map(t => t.trim()).filter(Boolean);
+    const tokensIlimitado = (process.env.KIWIFY_TOKEN_ILIMITADO || '').split(',').map(t => t.trim()).filter(Boolean);
     const todosTokens = [...tokensAvulso, ...tokensIlimitado];
 
-    if (token && todosTokens.length > 0 && !todosTokens.includes(token)) {
+    if (todosTokens.length > 0 && !todosTokens.includes(token)) {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
@@ -891,7 +945,8 @@ app.post('/kiwify', async (req, res) => {
 
 app.get('/teste', async (req, res) => {
   const { phone, plano, senha } = req.query;
-  if (senha !== 'matheus123') return res.status(401).json({ error: 'Senha inválida' });
+  if (!process.env.TESTE_SENHA) return res.status(404).end();
+  if (senha !== process.env.TESTE_SENHA) return res.status(401).json({ error: 'Senha inválida' });
   if (!phone) return res.status(400).json({ error: 'Phone obrigatório' });
   const usuario = await getUsuario(phone);
   if (plano === 'ilimitado') {
