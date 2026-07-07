@@ -218,7 +218,7 @@ const PERGUNTAS = {
 
 async function validarResposta(pergunta, resposta) {
   if (resposta.trim().length < 3) return false;
-  const respostasVazias = ['não sei', 'nao sei', 'talvez', 'depende', '?', '-', '.', 'ok', 'sim', 'nao', 'não'];
+  const respostasVazias = ['não sei', 'nao sei', 'talvez', 'depende', '?', '-', '.', 'ok'];
   if (respostasVazias.includes(resposta.toLowerCase().trim())) return false;
   return true;
 }
@@ -264,7 +264,7 @@ O contrato deve incluir espaço para assinaturas das partes e duas testemunhas.
 Gere o contrato completo agora.`;
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     max_tokens: 4000,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -283,7 +283,7 @@ ${textoContrato}
 Responda em formato simples, em português, listando apenas os problemas encontrados. Se o contrato estiver completo e consistente, responda apenas: "OK"`;
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     max_tokens: 500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -706,9 +706,19 @@ app.post('/webhook', async (req, res) => {
 
     if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario'].includes(usuario.etapa)) {
       if (msg === '1') {
-        await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+        if (!process.env.LINK_AVULSO) {
+          console.error('LINK_AVULSO não configurado!');
+          await enviarMensagem(phone, `⚠️ Estamos com um problema técnico para gerar seu link de pagamento.\n\nPor favor, digite *SUPORTE* que já te ajudamos a finalizar a compra.`);
+        } else {
+          await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+        }
       } else if (msg === '2') {
-        await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 49,99/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+        if (!process.env.LINK_ILIMITADO) {
+          console.error('LINK_ILIMITADO não configurado!');
+          await enviarMensagem(phone, `⚠️ Estamos com um problema técnico para gerar seu link de pagamento.\n\nPor favor, digite *SUPORTE* que já te ajudamos a finalizar a compra.`);
+        } else {
+          await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 49,99/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+        }
       } else {
         await enviarMensagem(phone, menuPrincipal(null));
       }
@@ -875,7 +885,7 @@ app.post('/webhook', async (req, res) => {
       await salvarUsuario(usuario);
       await enviarMensagem(phone, `Aplicando as modificações... ⏳`);
       const atualizado = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         max_tokens: 4000,
         messages: [
           { role: 'user', content: `Aqui está um contrato:\n\n${usuario.contrato.texto}` },
