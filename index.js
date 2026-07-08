@@ -510,10 +510,10 @@ Gero contratos completos e personalizados em minutos, por uma fração do custo 
 
 📋 *Escolha seu plano:*
 
-*1️⃣ Contrato Avulso — R$ 14,99*
+*1️⃣ Contrato Avulso — R$ 29,90*
 Um contrato completo com direito a modificações
 
-*2️⃣ Plano Ilimitado — R$ 49,99/mês*
+*2️⃣ Plano Ilimitado — R$ 39,90/mês*
 Contratos ilimitados com renovação automática ♾️
 Cancele quando quiser digitando *CANCELAR PLANO*${dicas}
 
@@ -577,7 +577,7 @@ async function enviarContrato(phone, usuario, formato) {
   }
   let upsell = '';
   if (usuario.plano === 'avulso' && process.env.LINK_ILIMITADO) {
-    upsell = `\n\n♾️ *Gostou? Tenha contratos ilimitados!*\nPor R$ 49,99/mês você gera quantos contratos quiser, sempre que precisar:\n🔗 ${process.env.LINK_ILIMITADO}`;
+    upsell = `\n\n♾️ *Gostou? Tenha contratos ilimitados!*\nPor R$ 39,90/mês você gera quantos contratos quiser, sempre que precisar:\n🔗 ${process.env.LINK_ILIMITADO}`;
   }
   await enviarMensagem(phone, `✅ *Contrato enviado!*\n\nRecebeu o arquivo? Se não abriu, tente salvar no seu dispositivo.\n\nDeseja alguma *alteração*? Me diga o que mudar!\n\nOu use os comandos:\n• Digite *PDF* para receber em PDF\n• Digite *WORD* para receber em Word\n• Digite *NOVO* para gerar outro contrato\n\nQualquer dúvida, digite *SUPORTE*.${upsell}`);
 }
@@ -727,7 +727,7 @@ app.post('/webhook', async (req, res) => {
         } else {
           usuario.etapa = 'aguardando_pagamento';
           await salvarUsuario(usuario);
-          await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 14,99*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+          await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 29,90*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
         }
       } else if (msg === '2') {
         if (!process.env.LINK_ILIMITADO) {
@@ -736,7 +736,7 @@ app.post('/webhook', async (req, res) => {
         } else {
           usuario.etapa = 'aguardando_pagamento';
           await salvarUsuario(usuario);
-          await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 49,99/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+          await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 39,90/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
         }
       } else {
         usuario.etapa = 'menu';
@@ -1048,9 +1048,9 @@ async function verificarInativos() {
       let novaEtapa = null;
 
       if (row.etapa === 'menu' && !row.plano && row.creditos === 0 && inativoMs >= umaHora && inativoMs < 24 * umaHora) {
-        mensagem = `Oi! 👋 Ainda precisa daquele contrato?\n\nEm 5 minutos você responde algumas perguntas e recebe seu contrato profissional em PDF e Word, pronto para assinar. ⚡\n\n*1️⃣ Contrato Avulso — R$ 14,99*\n*2️⃣ Plano Ilimitado — R$ 49,99/mês*\n\nResponda *1* ou *2* para começar. Qualquer dúvida, digite *SUPORTE*. 😊`;
+        mensagem = `Oi! 👋 Ainda precisa daquele contrato?\n\nEm 5 minutos você responde algumas perguntas e recebe seu contrato profissional em PDF e Word, pronto para assinar. ⚡\n\n*1️⃣ Contrato Avulso — R$ 29,90*\n*2️⃣ Plano Ilimitado — R$ 39,90/mês*\n\nResponda *1* ou *2* para começar. Qualquer dúvida, digite *SUPORTE*. 😊`;
       } else if (row.etapa === 'aguardando_pagamento' && inativoMs >= umaHora) {
-        mensagem = `Oi! 👋 Vi que você ainda não finalizou o pagamento.\n\nFicou alguma dúvida? Seu contrato profissional fica pronto em poucos minutos! ⚡\n\n*Contrato Avulso — R$ 14,99:*\n🔗 ${process.env.LINK_AVULSO}\n\n*Plano Ilimitado — R$ 49,99/mês:*\n🔗 ${process.env.LINK_ILIMITADO}\n\nQualquer dúvida é só digitar *SUPORTE*. 😊`;
+        mensagem = `Oi! 👋 Vi que você ainda não finalizou o pagamento.\n\nFicou alguma dúvida? Seu contrato profissional fica pronto em poucos minutos! ⚡\n\n*Contrato Avulso — R$ 29,90:*\n🔗 ${process.env.LINK_AVULSO}\n\n*Plano Ilimitado — R$ 39,90/mês:*\n🔗 ${process.env.LINK_ILIMITADO}\n\nQualquer dúvida é só digitar *SUPORTE*. 😊`;
       } else if ((row.etapa === 'coletando' || row.etapa === 'confirmando') && inativoMs >= 2 * umaHora && inativoMs < 24 * umaHora) {
         const usuario = await getUsuario(row.phone);
         if (row.etapa === 'coletando' && usuario.contrato?.tipo) {
