@@ -489,8 +489,15 @@ function menuPrincipal(usuario) {
     infoplano = `\n\n⚠️ Você tem *1 contrato disponível*. Após gerar não será possível gerar outro sem adquirir um novo acesso.`;
   }
 
-  if (temAcesso) {
-    return `Qual tipo de contrato você precisa? ⚖️${infoplano}
+  const introducao = temAcesso ? '' : `Olá! 👋 Sou o *ContratoBot*, seu assistente de contratos profissionais! ⚖️
+
+Respondo algumas perguntas rápidas e te mostro o contrato pronto antes de qualquer cobrança — o pagamento só entra na hora de gerar o arquivo final.
+
+⚠️ *Aviso importante:* Nossos contratos são gerados com base nas informações fornecidas e não substituem a assessoria de um advogado.
+
+`;
+
+  return `${introducao}Qual tipo de contrato você precisa? ⚖️${infoplano}
 
 1️⃣ Prestação de Serviços
 2️⃣ Aluguel de Imóvel
@@ -500,22 +507,17 @@ function menuPrincipal(usuario) {
 6️⃣ Outro
 
 Responda com o número da opção desejada.${dicas}`;
-  }
+}
 
-  return `Olá! 👋 Sou o *ContratoBot*, seu assistente de contratos profissionais! ⚖️
-
-Gero contratos completos e personalizados em minutos, por uma fração do custo de um advogado!
-
-⚠️ *Aviso importante:* Nossos contratos são gerados com base nas informações fornecidas e não substituem a assessoria de um advogado.
-
-📋 *Escolha seu plano:*
+function mensagemEscolherPlano() {
+  return `📋 *Escolha como prosseguir para gerar o arquivo:*
 
 *1️⃣ Contrato Avulso — R$ 29,90*
 Um contrato completo com direito a modificações
 
 *2️⃣ Plano Ilimitado — R$ 39,90/mês*
 Contratos ilimitados com renovação automática ♾️
-Cancele quando quiser digitando *CANCELAR PLANO*${dicas}
+Cancele quando quiser digitando *CANCELAR PLANO*
 
 Responda *1* ou *2* para continuar.`;
 }
@@ -719,29 +721,23 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (!usuario.plano && usuario.creditos === 0 && !['avaliacao', 'comentario', 'revisao'].includes(usuario.etapa)) {
+    if (usuario.etapa === 'aguardando_pagamento') {
       if (msg === '1') {
         if (!process.env.LINK_AVULSO) {
           console.error('LINK_AVULSO não configurado!');
           await enviarMensagem(phone, `⚠️ Estamos com um problema técnico para gerar seu link de pagamento.\n\nPor favor, digite *SUPORTE* que já te ajudamos a finalizar a compra.`);
         } else {
-          usuario.etapa = 'aguardando_pagamento';
-          await salvarUsuario(usuario);
-          await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 29,90*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+          await enviarMensagem(phone, `Ótimo! Acesse o link para pagar *R$ 29,90*:\n\n🔗 ${process.env.LINK_AVULSO}\n\nApós o pagamento seu contrato será gerado automaticamente! ✅`);
         }
       } else if (msg === '2') {
         if (!process.env.LINK_ILIMITADO) {
           console.error('LINK_ILIMITADO não configurado!');
           await enviarMensagem(phone, `⚠️ Estamos com um problema técnico para gerar seu link de pagamento.\n\nPor favor, digite *SUPORTE* que já te ajudamos a finalizar a compra.`);
         } else {
-          usuario.etapa = 'aguardando_pagamento';
-          await salvarUsuario(usuario);
-          await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 39,90/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu acesso será liberado automaticamente! ✅`);
+          await enviarMensagem(phone, `Ótimo! Acesse o link para assinar por *R$ 39,90/mês*:\n\n🔗 ${process.env.LINK_ILIMITADO}\n\nApós o pagamento seu contrato será gerado automaticamente! ✅`);
         }
       } else {
-        usuario.etapa = 'menu';
-        await salvarUsuario(usuario);
-        await enviarMensagem(phone, menuPrincipal(null));
+        await enviarMensagem(phone, mensagemEscolherPlano());
       }
       return res.sendStatus(200);
     }
@@ -838,6 +834,13 @@ app.post('/webhook', async (req, res) => {
       const perguntas = PERGUNTAS[tipo];
 
       if (msgUpper === 'SIM') {
+        if (!usuario.plano && usuario.creditos === 0) {
+          usuario.etapa = 'aguardando_pagamento';
+          await salvarUsuario(usuario);
+          await enviarMensagem(phone, `Seu contrato está pronto para ser gerado! 🎉\n\n${mensagemEscolherPlano()}`);
+          return res.sendStatus(200);
+        }
+
         usuario.etapa = 'gerando';
         await salvarUsuario(usuario);
         await enviarMensagem(phone, `Gerando seu contrato... ⏳\n\nIsso pode levar alguns segundos!`);
@@ -923,6 +926,8 @@ app.post('/webhook', async (req, res) => {
 
   } catch (error) {
     console.error('Erro:', error);
+    const phone = req.body?.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    if (phone) await enviarMensagem(phone, 'Ops, tive um probleminha aqui pra processar sua mensagem 😅 pode mandar de novo?');
     res.sendStatus(500);
   }
 });
@@ -968,10 +973,18 @@ app.post('/kiwify', async (req, res) => {
       usuario.dataExpiracao = null;
     }
 
-    usuario.etapa = 'menu';
+    const perguntasContrato = usuario.contrato?.tipo ? PERGUNTAS[usuario.contrato.tipo] : null;
+    const contratoPendente = perguntasContrato && usuario.contrato.dados?.length === perguntasContrato.length;
+
+    usuario.etapa = contratoPendente ? 'confirmando' : 'menu';
     usuario.followupEnviado = 0;
     await salvarUsuario(usuario);
-    enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(usuario)}`);
+
+    if (contratoPendente) {
+      enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu contrato de *${usuario.contrato.tipo}* está pronto para ser gerado!\n\n✅ Digite *SIM* para gerar o contrato\n✏️ Ou o número da pergunta que deseja corrigir`);
+    } else {
+      enviarMensagem(phone, `🎉 *Pagamento confirmado!* Seu acesso foi liberado!\n\n${menuPrincipal(usuario)}`);
+    }
     res.sendStatus(200);
   } catch (error) {
     console.error('Erro kiwify:', error);
@@ -1048,7 +1061,7 @@ async function verificarInativos() {
       let novaEtapa = null;
 
       if (row.etapa === 'menu' && !row.plano && row.creditos === 0 && inativoMs >= umaHora && inativoMs < 24 * umaHora) {
-        mensagem = `Oi! 👋 Ainda precisa daquele contrato?\n\nEm 5 minutos você responde algumas perguntas e recebe seu contrato profissional em PDF e Word, pronto para assinar. ⚡\n\n*1️⃣ Contrato Avulso — R$ 29,90*\n*2️⃣ Plano Ilimitado — R$ 39,90/mês*\n\nResponda *1* ou *2* para começar. Qualquer dúvida, digite *SUPORTE*. 😊`;
+        mensagem = `Oi! 👋 Ainda precisa daquele contrato?\n\nEm 5 minutos você responde algumas perguntas e já vê seu contrato pronto — o pagamento só entra na hora de gerar o arquivo. ⚡\n\n1️⃣ Prestação de Serviços\n2️⃣ Aluguel de Imóvel\n3️⃣ Compra e Venda\n4️⃣ Contrato de Trabalho\n5️⃣ Parceria / Sociedade\n6️⃣ Outro\n\nResponda com o número da opção. Qualquer dúvida, digite *SUPORTE*. 😊`;
       } else if (row.etapa === 'aguardando_pagamento' && inativoMs >= umaHora) {
         mensagem = `Oi! 👋 Vi que você ainda não finalizou o pagamento.\n\nFicou alguma dúvida? Seu contrato profissional fica pronto em poucos minutos! ⚡\n\n*Contrato Avulso — R$ 29,90:*\n🔗 ${process.env.LINK_AVULSO}\n\n*Plano Ilimitado — R$ 39,90/mês:*\n🔗 ${process.env.LINK_ILIMITADO}\n\nQualquer dúvida é só digitar *SUPORTE*. 😊`;
       } else if ((row.etapa === 'coletando' || row.etapa === 'confirmando') && inativoMs >= 2 * umaHora && inativoMs < 24 * umaHora) {
